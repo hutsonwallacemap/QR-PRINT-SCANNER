@@ -5,3 +5,4 @@ qrcode[pil]>=7.4.2
 pillow>=10.4.0
 pymupdf>=1.24.0
 pywin32>=306; sys_platform == "win32"
+docx2pdf>=0.1.8; sys_platform == "win32"

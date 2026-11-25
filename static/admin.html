@@ -333,7 +333,7 @@
               <div style="font-size:0.76rem; color:var(--muted);">${j.total_file_pages} pg • ${(j.file_size/1024).toFixed(0)} KB</div>
             </td>
             <td style="font-size:0.82rem;">
-              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.page_range} • x${j.copies}
+              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • ${j.paper_size || "A4"} • pg: ${j.page_range} • x${j.copies}
             </td>
             <td>
               <span class="badge ${j.status}">${j.status.replace("_"," ")}</span>

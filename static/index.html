@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Scan &amp; Print</title>
+  <title>Scan &amp; Print — Instant Print Shop</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --border: #334155;
+      --bg: #0b1120;
+      --card: #162032;
+      --surface: #0f172a;
+      --border: #2b3950;
       --text: #f8fafc;
       --muted: #94a3b8;
       --primary: #3b82f6;
+      --primary-dark: #2563eb;
       --success: #22c55e;
       --warn: #f59e0b;
       --danger: #ef4444;
@@ -22,196 +24,250 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 16px 16px 32px;
+      padding: 16px 14px 36px;
     }
-    .container { max-width: 480px; margin: 0 auto; }
+    .container { max-width: 500px; margin: 0 auto; }
 
-    /* Header */
-    header { text-align: center; margin-bottom: 20px; }
-    header h1 { font-size: 1.6rem; margin-bottom: 4px; }
-    header p { color: var(--muted); font-size: 0.9rem; }
+    header { text-align: center; margin-bottom: 18px; }
+    header h1 { font-size: 1.55rem; letter-spacing: -0.3px; margin-bottom: 4px; }
+    header p { color: var(--muted); font-size: 0.88rem; }
     .shop-badge {
-      display: inline-block; margin-top: 8px; padding: 4px 14px;
-      border-radius: 999px; font-size: 0.8rem; font-weight: 600;
-      background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35); color: #93c5fd;
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 10px; padding: 5px 14px; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 600;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #86efac;
     }
 
-    /* Cards */
     .card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 16px; padding: 20px; margin-bottom: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .step-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; font-size: 0.88rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.4px; color: #cbd5e1;
+    }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800;
     }
 
-    /* Dropzone */
     .dropzone {
-      border: 2px dashed #475569; border-radius: 14px; padding: 32px 16px;
-      text-align: center; cursor: pointer; transition: all 0.2s;
+      border: 2px dashed #475569; border-radius: 14px;
+      padding: 26px 16px; text-align: center; cursor: pointer;
+      transition: all 0.2s; background: rgba(15, 23, 42, 0.45);
     }
-    .dropzone.dragover { border-color: var(--primary); background: rgba(59,130,246,0.08); }
+    .dropzone.dragover { border-color: var(--primary); background: rgba(59,130,246,0.1); }
     .dropzone.has-files { border-color: var(--success); border-style: solid; background: rgba(34,197,94,0.06); }
     .dropzone input { display: none; }
-    .dropzone .icon { font-size: 2.4rem; margin-bottom: 8px; }
-    .dropzone .main-text { font-size: 1.05rem; font-weight: 600; }
-    .dropzone .hint { color: var(--muted); font-size: 0.82rem; margin-top: 6px; }
+    .dropzone .icon { font-size: 2.2rem; margin-bottom: 6px; }
+    .dropzone .main-text { font-size: 1rem; font-weight: 600; }
+    .dropzone .hint { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
 
-    /* File list */
     .file-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
     .file-item {
       display: flex; justify-content: space-between; align-items: center;
-      background: #0f172a; border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 12px; font-size: 0.88rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 9px 12px; font-size: 0.86rem;
     }
     .file-item .fi-info { display: flex; align-items: center; gap: 8px; overflow: hidden; }
-    .file-item .fi-icon { font-size: 1.2rem; flex-shrink: 0; }
     .file-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file-item .fi-size { color: var(--muted); font-size: 0.78rem; flex-shrink: 0; }
+    .file-item .fi-size { color: var(--muted); font-size: 0.76rem; flex-shrink: 0; margin-left: 8px; }
     .file-item .fi-remove {
       background: none; border: none; color: var(--danger);
-      font-weight: 700; cursor: pointer; font-size: 1.1rem; padding: 4px 8px;
+      font-weight: 700; cursor: pointer; font-size: 1rem; padding: 2px 6px; margin-left: 6px;
     }
 
-    /* Options */
-    .section-title { font-size: 0.82rem; color: var(--muted); font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .opt-group { margin-bottom: 14px; }
+    .opt-group:last-child { margin-bottom: 0; }
+    .opt-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.82rem; color: var(--muted); font-weight: 600; margin-bottom: 6px;
+    }
+    .opt-hint { font-size: 0.74rem; color: #64748b; font-weight: 400; }
+
     .seg-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .seg-btn {
-      padding: 12px; border-radius: 10px; border: 1px solid var(--border);
-      background: #0f172a; color: var(--muted); font-weight: 600;
-      cursor: pointer; text-align: center; font-size: 0.95rem; transition: all 0.15s;
+      padding: 11px 10px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-weight: 600;
+      cursor: pointer; text-align: center; font-size: 0.9rem; transition: all 0.15s;
     }
-    .seg-btn.active { background: rgba(59,130,246,0.2); border-color: var(--primary); color: #fff; }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    .seg-btn.active {
+      background: rgba(59,130,246,0.2); border-color: var(--primary); color: #fff;
+    }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     input[type="text"], input[type="number"], select {
       width: 100%; padding: 10px 12px; border-radius: 10px;
-      border: 1px solid var(--border); background: #0f172a; color: var(--text); font-size: 0.95rem;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); font-size: 0.92rem;
     }
-    .copies-row { display: flex; align-items: center; gap: 8px; }
+    .copies-row { display: flex; align-items: center; gap: 6px; }
     .copies-row button {
-      width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--border);
-      background: #0f172a; color: var(--text); font-size: 1.3rem; cursor: pointer;
+      width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 1.25rem; cursor: pointer;
     }
-    .copies-row input { text-align: center; width: 60px; }
+    .copies-row input { text-align: center; }
 
-    /* Submit */
+    .adv-toggle {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      color: #93c5fd; font-size: 0.82rem; font-weight: 600; margin-top: 12px;
+    }
+    .adv-body { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .adv-body.open { display: block; }
+
     .submit-btn {
-      width: 100%; padding: 16px; border: none; border-radius: 14px;
-      background: var(--primary); color: #fff; font-size: 1.1rem; font-weight: 700;
-      cursor: pointer; transition: opacity 0.2s; margin-top: 4px;
+      width: 100%; padding: 15px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff; font-size: 1.06rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
     }
-    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
-    /* Status */
-    .status-section { display: none; }
+    .help-card {
+      background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px; margin-top: 14px; font-size: 0.8rem; color: var(--muted);
+      line-height: 1.6;
+    }
+    .help-card strong { color: #cbd5e1; }
+
+    .error-msg {
+      color: #fca5a5; background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.35);
+      padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: none; font-size: 0.86rem;
+    }
+
+    .status-section { display: none; margin-top: 14px; }
     .status-section.visible { display: block; }
-
-    /* Success overlay */
-    .success-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.92);
-      z-index: 100; justify-content: center; align-items: center; flex-direction: column;
-    }
-    .success-overlay.show { display: flex; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .success-check {
-      width: 100px; height: 100px; border-radius: 50%; background: rgba(34,197,94,0.15);
-      border: 3px solid var(--success); display: flex; align-items: center; justify-content: center;
-      font-size: 3rem; animation: popIn 0.4s ease;
-    }
-    @keyframes popIn { 0% { transform: scale(0.5); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
-    .success-text { text-align: center; margin-top: 20px; }
-    .success-text h2 { font-size: 1.5rem; color: var(--success); margin-bottom: 6px; }
-    .success-text p { color: var(--muted); font-size: 0.95rem; }
-    .success-close {
-      margin-top: 24px; padding: 12px 32px; border-radius: 12px; border: 1px solid var(--border);
-      background: var(--card); color: var(--text); font-weight: 600; cursor: pointer; font-size: 1rem;
-    }
-
-    /* Job status cards */
     .job-card {
-      padding: 14px; border-radius: 12px; background: #0f172a;
-      border: 1px solid var(--border); margin-top: 10px;
+      padding: 12px; border-radius: 10px; background: var(--surface);
+      border: 1px solid var(--border); margin-top: 8px;
     }
-    .job-top { display: flex; justify-content: space-between; align-items: center; }
-    .job-file { font-weight: 600; font-size: 0.95rem; }
+    .job-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 999px; font-size: 0.7rem;
+      font-weight: 700; text-transform: uppercase; flex-shrink: 0;
     }
     .badge.queued, .badge.printing { background: rgba(245,158,11,0.2); color: #fcd34d; }
     .badge.printed { background: rgba(34,197,94,0.2); color: #86efac; }
     .badge.failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
     .badge.waiting_approval { background: rgba(59,130,246,0.2); color: #93c5fd; }
-    .job-msg { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
 
-    .error-msg {
-      color: #fca5a5; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.35);
-      padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; display: none; font-size: 0.88rem;
+    .success-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(11,17,32,0.93);
+      z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 24px;
     }
-
-    /* Collapsible advanced */
-    .advanced-toggle {
-      display: flex; align-items: center; gap: 6px; cursor: pointer;
-      color: var(--muted); font-size: 0.82rem; font-weight: 600; margin-top: 14px; margin-bottom: 8px;
+    .success-overlay.show { display: flex; }
+    .success-check {
+      width: 92px; height: 92px; border-radius: 50%; background: rgba(34,197,94,0.15);
+      border: 3px solid var(--success); display: flex; align-items: center; justify-content: center;
+      font-size: 2.8rem; color: var(--success);
     }
-    .advanced-toggle .arrow { transition: transform 0.2s; }
-    .advanced-toggle.open .arrow { transform: rotate(90deg); }
-    .advanced-body { display: none; }
-    .advanced-body.open { display: block; }
+    .success-text { text-align: center; margin-top: 18px; }
+    .success-text h2 { font-size: 1.45rem; color: var(--success); margin-bottom: 6px; }
+    .success-text p { color: var(--muted); font-size: 0.92rem; }
+    .success-close {
+      margin-top: 22px; padding: 12px 28px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--card); color: var(--text);
+      font-weight: 600; cursor: pointer; font-size: 0.96rem;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>🖨️ Scan &amp; Print</h1>
-      <p>Upload your photos or documents — prints automatically!</p>
-      <div class="shop-badge" id="shopBadge">Connecting...</div>
+      <p>Upload photos, PDFs, or Word files — prints automatically</p>
+      <div class="shop-badge" id="shopBadge">● Connecting...</div>
     </header>
 
     <div class="error-msg" id="errorBox"></div>
 
     <form id="printForm">
+      <!-- Step 1: Files -->
       <div class="card">
+        <div class="step-header"><span class="step-num">1</span> Choose Your Files</div>
         <div class="dropzone" id="dropzone">
-          <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.bmp,.gif,.webp,.tiff,.tif,.pdf,.txt,.csv,.md" />
-          <div class="icon" id="dropIcon">📸</div>
-          <div class="main-text" id="dropText">Tap to choose photos or PDFs</div>
-          <div class="hint">JPG, PNG, PDF, TXT • Multiple files OK • Max 50MB each</div>
+          <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.bmp,.gif,.webp,.tiff,.tif,.pdf,.doc,.docx,.txt,.csv,.md" />
+          <div class="icon" id="dropIcon">📄📸</div>
+          <div class="main-text" id="dropText">Tap to select Photos, PDF, or Word</div>
+          <div class="hint">JPG, PNG, PDF, DOC/DOCX, TXT • Up to 10 files (50MB max)</div>
         </div>
         <div class="file-list" id="fileList"></div>
       </div>
 
+      <!-- Step 2: Options -->
       <div class="card">
-        <div class="section-title">Print Options</div>
-        <div class="seg-group">
-          <button type="button" class="seg-btn active" data-color="color">🎨 Color</button>
-          <button type="button" class="seg-btn" data-color="bw">⬛ Black &amp; White</button>
+        <div class="step-header"><span class="step-num">2</span> Print Settings</div>
+
+        <div class="opt-group">
+          <div class="opt-label"><span>Color Mode</span></div>
+          <div class="seg-group">
+            <button type="button" class="seg-btn active" data-color="color">🎨 Color</button>
+            <button type="button" class="seg-btn" data-color="bw">⬛ Black &amp; White</button>
+          </div>
+        </div>
+
+        <div class="opt-group">
+          <div class="opt-label">
+            <span>Print Sides</span>
+            <span class="opt-hint">2-sided saves paper</span>
+          </div>
+          <div class="seg-group">
+            <button type="button" class="seg-btn active" data-sides="one">📄 One Side</button>
+            <button type="button" class="seg-btn" data-sides="both">📑 Both Sides</button>
+          </div>
+        </div>
+
+        <div class="opt-group">
+          <div class="opt-label">
+            <span>Pages</span>
+            <span class="opt-hint">e.g. all, 1-3, or 2,5</span>
+          </div>
+          <div class="seg-group" style="margin-bottom:8px;">
+            <button type="button" class="seg-btn active" id="pagesAllBtn">All Pages</button>
+            <button type="button" class="seg-btn" id="pagesCustomBtn">Custom Pages</button>
+          </div>
+          <input type="text" id="pageRange" value="all" placeholder="e.g. 1-3, 5" style="display:none;" />
         </div>
 
         <div class="row2">
-          <div class="field">
-            <label>Copies</label>
+          <div class="opt-group">
+            <div class="opt-label"><span>Copies</span></div>
             <div class="copies-row">
               <button type="button" id="decCopies">−</button>
               <input type="number" id="copies" value="1" min="1" max="99" />
               <button type="button" id="incCopies">+</button>
             </div>
           </div>
-          <div class="field">
-            <label>Your Name</label>
+          <div class="opt-group">
+            <div class="opt-label"><span>Your Name</span></div>
             <input type="text" id="customerName" placeholder="Optional" />
           </div>
         </div>
 
-        <div class="advanced-toggle" id="advToggle">
-          <span class="arrow">▶</span> Advanced Options
-        </div>
-        <div class="advanced-body" id="advBody">
+        <div class="adv-toggle" id="advToggle">▸ Paper Size &amp; Orientation</div>
+        <div class="adv-body" id="advBody">
           <div class="row2">
-            <div class="field">
-              <label for="pageRange">Pages</label>
-              <input type="text" id="pageRange" value="all" placeholder="all or 1-3, 5" />
+            <div class="opt-group">
+              <div class="opt-label"><span>Paper Size</span></div>
+              <select id="paperSize">
+                <option value="A4">A4 (Standard)</option>
+                <option value="Letter">Letter</option>
+                <option value="Legal">Legal</option>
+                <option value="A3">A3</option>
+                <option value="A5">A5</option>
+              </select>
             </div>
-            <div class="field">
-              <label for="orientation">Orientation</label>
+            <div class="opt-group">
+              <div class="opt-label"><span>Orientation</span></div>
               <select id="orientation">
                 <option value="auto">Auto (Best Fit)</option>
                 <option value="portrait">Portrait</option>
@@ -227,22 +283,26 @@
       </button>
     </form>
 
-    <div class="status-section" id="statusSection">
-      <div class="card">
-        <div class="section-title">Print Status</div>
-        <div id="statusList"></div>
-      </div>
+    <div class="card status-section" id="statusSection">
+      <div class="step-header"><span class="step-num">✓</span> Live Print Status</div>
+      <div id="statusList"></div>
+    </div>
+
+    <div class="help-card">
+      <strong>Need help?</strong><br />
+      • <strong>Images &amp; Photos:</strong> Automatically scaled to fit the page cleanly.<br />
+      • <strong>PDF &amp; Word (.docx):</strong> Pick <em>Custom Pages</em> if you only want specific pages (like <code>1-3, 5</code>).<br />
+      • <strong>Instant Printing:</strong> Your file goes directly to the shop printer—collect it at the counter!
     </div>
   </div>
 
-  <!-- Success Overlay -->
   <div class="success-overlay" id="successOverlay">
     <div class="success-check">✓</div>
     <div class="success-text">
       <h2>Sent to Printer!</h2>
-      <p id="successDetail">Your files are printing now.</p>
+      <p id="successDetail">Your files are printing automatically.</p>
     </div>
-    <button class="success-close" id="successClose">Print More</button>
+    <button class="success-close" id="successClose">View Live Status / Print More</button>
   </div>
 
   <script>
@@ -254,21 +314,22 @@
     const statusSection = document.getElementById("statusSection");
     const statusList = document.getElementById("statusList");
     const successOverlay = document.getElementById("successOverlay");
+    const pageRangeInput = document.getElementById("pageRange");
 
     let selectedFiles = [];
     let colorMode = "color";
+    let sidesMode = "one";
     let activeJobIds = [];
     let pollTimer = null;
 
-    // Load server info
     fetch("/api/info").then(r => r.json()).then(data => {
-      const name = data.shop_name || data.active_printer || "Ready";
-      document.getElementById("shopBadge").textContent = `🖨️ ${name} • Auto-Print ON`;
+      const label = data.shop_name || data.active_printer || "Shop Printer";
+      const mode = data.auto_print ? "Auto-Print ON" : "Approval Mode";
+      document.getElementById("shopBadge").textContent = `● ${label} • ${mode}`;
     }).catch(() => {
-      document.getElementById("shopBadge").textContent = "Connected";
+      document.getElementById("shopBadge").textContent = "● Connected";
     });
 
-    // Color toggle
     document.querySelectorAll("[data-color]").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("[data-color]").forEach(b => b.classList.remove("active"));
@@ -277,23 +338,41 @@
       });
     });
 
-    // Copies
+    document.querySelectorAll("[data-sides]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-sides]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        sidesMode = btn.dataset.sides;
+      });
+    });
+
+    document.getElementById("pagesAllBtn").addEventListener("click", () => {
+      document.getElementById("pagesAllBtn").classList.add("active");
+      document.getElementById("pagesCustomBtn").classList.remove("active");
+      pageRangeInput.style.display = "none";
+      pageRangeInput.value = "all";
+    });
+    document.getElementById("pagesCustomBtn").addEventListener("click", () => {
+      document.getElementById("pagesCustomBtn").classList.add("active");
+      document.getElementById("pagesAllBtn").classList.remove("active");
+      pageRangeInput.style.display = "block";
+      if (pageRangeInput.value === "all") pageRangeInput.value = "";
+      pageRangeInput.focus();
+    });
+
     document.getElementById("decCopies").onclick = () => {
       const el = document.getElementById("copies");
-      el.value = Math.max(1, (parseInt(el.value) || 1) - 1);
+      el.value = Math.max(1, (parseInt(el.value, 10) || 1) - 1);
     };
     document.getElementById("incCopies").onclick = () => {
       const el = document.getElementById("copies");
-      el.value = Math.min(99, (parseInt(el.value) || 1) + 1);
+      el.value = Math.min(99, (parseInt(el.value, 10) || 1) + 1);
     };
 
-    // Advanced toggle
     document.getElementById("advToggle").addEventListener("click", () => {
-      document.getElementById("advToggle").classList.toggle("open");
       document.getElementById("advBody").classList.toggle("open");
     });
 
-    // File selection
     dropzone.addEventListener("click", () => fileInput.click());
     dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
     dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
@@ -302,8 +381,8 @@
 
     function addFiles(files) {
       for (const f of files) {
-        if (selectedFiles.length >= 10) break;
-        if (f.size > 50 * 1024 * 1024) { showError(`${f.name} is too large (max 50MB).`); continue; }
+        if (selectedFiles.length >= 10) { showError("Maximum 10 files per upload."); break; }
+        if (f.size > 50 * 1024 * 1024) { showError(`${f.name} is over 50MB.`); continue; }
         selectedFiles.push(f);
       }
       renderFiles();
@@ -312,14 +391,15 @@
     function fileIcon(name) {
       const ext = name.split(".").pop().toLowerCase();
       if (["jpg","jpeg","png","bmp","gif","webp","tiff","tif"].includes(ext)) return "🖼️";
-      if (ext === "pdf") return "📄";
+      if (ext === "pdf") return "📕";
+      if (["doc","docx"].includes(ext)) return "📘";
       return "📝";
     }
 
     function formatSize(bytes) {
       if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + " KB";
-      return (bytes/1024/1024).toFixed(1) + " MB";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+      return (bytes / 1024 / 1024).toFixed(1) + " MB";
     }
 
     function renderFiles() {
@@ -329,24 +409,26 @@
         row.className = "file-item";
         row.innerHTML = `
           <div class="fi-info">
-            <span class="fi-icon">${fileIcon(f.name)}</span>
+            <span>${fileIcon(f.name)}</span>
             <span class="fi-name">${f.name}</span>
           </div>
-          <span class="fi-size">${formatSize(f.size)}</span>
+          <div style="display:flex; align-items:center;">
+            <span class="fi-size">${formatSize(f.size)}</span>
+          </div>
         `;
         const rm = document.createElement("button");
         rm.type = "button"; rm.className = "fi-remove"; rm.textContent = "✕";
         rm.onclick = () => { selectedFiles.splice(idx, 1); renderFiles(); };
-        row.appendChild(rm);
+        row.lastElementChild.appendChild(rm);
         fileListEl.appendChild(row);
       });
 
       const hasFiles = selectedFiles.length > 0;
       dropzone.classList.toggle("has-files", hasFiles);
-      document.getElementById("dropIcon").textContent = hasFiles ? "✅" : "📸";
+      document.getElementById("dropIcon").textContent = hasFiles ? "✅" : "📄📸";
       document.getElementById("dropText").textContent = hasFiles
-        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} selected — tap to add more`
-        : "Tap to choose photos or PDFs";
+        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} ready — tap to add more`
+        : "Tap to select Photos, PDF, or Word";
       submitBtn.disabled = !hasFiles;
       submitBtn.textContent = hasFiles
         ? `🖨️ Print ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""} Now`
@@ -358,7 +440,6 @@
       errorBox.style.display = msg ? "block" : "none";
     }
 
-    // Submit
     document.getElementById("printForm").addEventListener("submit", async e => {
       e.preventDefault();
       showError("");
@@ -370,9 +451,11 @@
       const form = new FormData();
       selectedFiles.forEach(f => form.append("files", f));
       form.append("color_mode", colorMode);
-      form.append("page_range", document.getElementById("pageRange").value || "all");
+      form.append("sides", sidesMode);
+      form.append("page_range", (pageRangeInput.value || "all").trim() || "all");
       form.append("copies", document.getElementById("copies").value || "1");
       form.append("orientation", document.getElementById("orientation").value);
+      form.append("paper_size", document.getElementById("paperSize").value);
       form.append("customer_name", document.getElementById("customerName").value || "Walk-in Customer");
 
       try {
@@ -390,17 +473,14 @@
         renderStatuses(data.jobs);
         startPolling();
 
-        // Show success overlay
         document.getElementById("successDetail").textContent =
-          `${count} file${count > 1 ? "s" : ""} sent to the printer. Check status below.`;
+          `${count} file${count > 1 ? "s" : ""} received and sent to the printer.`;
         successOverlay.classList.add("show");
       } catch (err) {
         showError(err.message);
       } finally {
         submitBtn.disabled = !selectedFiles.length;
-        submitBtn.textContent = selectedFiles.length
-          ? `🖨️ Print ${selectedFiles.length} Files Now`
-          : "Select files to print";
+        if (!selectedFiles.length) submitBtn.textContent = "Select files to print";
       }
     });
 
@@ -412,10 +492,14 @@
       statusList.innerHTML = jobs.map(j => `
         <div class="job-card">
           <div class="job-top">
-            <span class="job-file">${fileIcon(j.filename)} ${j.filename}</span>
+            <span style="font-weight:600; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis;">
+              ${fileIcon(j.filename)} ${j.filename}
+            </span>
             <span class="badge ${j.status}">${j.status.replace("_", " ")}</span>
           </div>
-          <div class="job-msg">${j.message}</div>
+          <div style="font-size:0.78rem; color:#94a3b8; margin-top:5px;">
+            ${j.message} • ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies}
+          </div>
         </div>
       `).join("");
     }
