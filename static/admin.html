@@ -194,7 +194,7 @@
           <div class="toggle-row">
             <div class="toggle-label">
               <strong>Verify UPI Payment Before Print</strong>
-              <small>Hold paid jobs for 1-click verify (ON = safest)</small>
+              <small>OFF = auto-print after customer pays (no gateway needed)</small>
             </div>
             <label class="switch">
               <input type="checkbox" id="verifyPayToggle" />
@@ -270,7 +270,7 @@
         const data = await res.json();
         document.getElementById("qrUrl").textContent = data.qr_url;
         document.getElementById("autoPrintToggle").checked = data.auto_print;
-        document.getElementById("verifyPayToggle").checked = data.require_payment_verify !== false;
+        document.getElementById("verifyPayToggle").checked = Boolean(data.require_payment_verify);
         document.getElementById("customUrl").value = data.custom_base_url || "";
         document.getElementById("shopId").value = data.shop_id || "";
         document.getElementById("shopName").value = data.shop_name || "";

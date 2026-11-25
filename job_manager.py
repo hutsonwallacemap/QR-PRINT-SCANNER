@@ -81,7 +81,7 @@ class PrintJobManager:
         self.registry_synced = False
         self.shop_phone = ""
         self.upi_id = ""
-        self.require_payment_verify = True
+        self.require_payment_verify = False
         self.has_logo = False
         self.price_bw: float = 2.0
         self.price_color: float = 10.0
