@@ -46,11 +46,13 @@
 </head>
 <body>
   <div class="poster">
+    <img id="shopLogo" src="" alt="Shop Logo" style="display:none; width:72px; height:72px; object-fit:contain; margin:0 auto 10px;" />
     <div class="shop-name" id="shopNameDisplay"></div>
     <h1>📱 Scan &amp; Print Instantly</h1>
-    <div class="sub">No app required • Photos, PDFs &amp; Documents</div>
+    <div class="sub">No app required • Photos, PDFs, Word &amp; Documents</div>
     <img src="/api/qr" alt="Scan to Print QR Code" />
     <div class="url" id="posterUrl">Loading URL...</div>
+    <div id="shopPhoneDisplay" style="font-size:0.95rem; color:#475569; margin:-14px 0 18px; font-weight:600;"></div>
     <div class="steps">
       <strong>How it works:</strong><br /><br />
       <span class="step-num">1</span> Open your phone camera<br />
@@ -67,6 +69,14 @@
       document.getElementById("posterUrl").textContent = d.qr_url;
       if (d.shop_name) {
         document.getElementById("shopNameDisplay").textContent = d.shop_name;
+      }
+      if (d.shop_phone) {
+        document.getElementById("shopPhoneDisplay").textContent = "📞 " + d.shop_phone;
+      }
+      if (d.has_logo) {
+        const lg = document.getElementById("shopLogo");
+        lg.src = "/api/logo?t=" + Date.now();
+        lg.style.display = "block";
       }
     });
   </script>

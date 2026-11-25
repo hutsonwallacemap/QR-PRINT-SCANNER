@@ -73,6 +73,9 @@ class PrintJobManager:
         self.active_printer: Optional[str] = get_default_printer()
         self.custom_base_url = ""
         self.shop_name = ""
+        self.shop_phone = ""
+        self.upi_id = ""
+        self.has_logo = False
         self.price_bw: float = 2.0
         self.price_color: float = 10.0
         self._next_token: int = 101

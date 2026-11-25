@@ -108,6 +108,7 @@
     <div class="topbar">
       <h1>🖨️ QR Print — Shop Dashboard</h1>
       <div class="topbar-btns">
+        <a href="/api/report/csv" class="btn btn-success">📊 Download CSV Report</a>
         <a href="/" target="_blank" class="btn">📱 Customer Page</a>
         <a href="/qr-poster" target="_blank" class="btn btn-primary">🖨️ Print QR Poster</a>
       </div>
@@ -129,10 +130,27 @@
 
         <div class="card" style="margin-top:16px;">
           <div class="field" style="margin-top:0;">
-            <label>Shop Name (shown to customers)</label>
+            <label>Shop Name &amp; Phone (shown on Poster)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px;">
+              <input type="text" id="shopName" placeholder="Shop Name" />
+              <input type="text" id="shopPhone" placeholder="Phone (optional)" />
+              <button class="btn btn-primary" onclick="saveShopInfo()">Save</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Shop UPI ID (for Customer UPI Pay QR)</label>
             <div style="display:flex; gap:6px;">
-              <input type="text" id="shopName" placeholder="e.g. Sharma Print & Xerox" />
-              <button class="btn btn-primary" onclick="saveShopName()">Save</button>
+              <input type="text" id="upiId" placeholder="e.g. shopname@okicici" />
+              <button class="btn btn-primary" onclick="saveUpi()">Save</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Shop Logo (for QR Poster)</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="file" id="logoFile" accept="image/*" style="font-size:0.8rem;" />
+              <button class="btn" onclick="uploadLogo()">Upload</button>
             </div>
           </div>
 
@@ -160,6 +178,17 @@
             </div>
             <label class="switch">
               <input type="checkbox" id="autoPrintToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <strong>Start with Windows</strong>
+              <small>Auto-launch silently when PC turns on</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="autostartToggle" />
               <span class="slider"></span>
             </label>
           </div>
@@ -223,6 +252,8 @@
         document.getElementById("autoPrintToggle").checked = data.auto_print;
         document.getElementById("customUrl").value = data.custom_base_url || "";
         document.getElementById("shopName").value = data.shop_name || "";
+        document.getElementById("shopPhone").value = data.shop_phone || "";
+        document.getElementById("upiId").value = data.upi_id || "";
         document.getElementById("priceBw").value = data.price_bw ?? 2;
         document.getElementById("priceColor").value = data.price_color ?? 10;
 
@@ -289,13 +320,45 @@
       document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
     }
 
-    async function saveShopName() {
+    async function saveShopInfo() {
       const name = document.getElementById("shopName").value;
+      const phone = document.getElementById("shopPhone").value;
       await fetch("/api/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop_name: name }),
+        body: JSON.stringify({ shop_name: name, shop_phone: phone }),
       });
     }
+
+    async function saveUpi() {
+      const upi = document.getElementById("upiId").value;
+      await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ upi_id: upi }),
+      });
+    }
+
+    async function uploadLogo() {
+      const file = document.getElementById("logoFile").files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append("file", file);
+      await fetch("/api/logo", { method: "POST", body: fd });
+      alert("Shop logo saved! Check Print QR Poster.");
+    }
+
+    async function loadAutostart() {
+      try {
+        const res = await fetch("/api/autostart");
+        const data = await res.json();
+        const el = document.getElementById("autostartToggle");
+        el.disabled = !data.supported;
+        el.checked = data.enabled;
+      } catch {}
+    }
+
+    document.getElementById("autostartToggle").addEventListener("change", async e => {
+      await fetch(`/api/autostart?enable=${e.target.checked}`, { method: "POST" });
+    });
 
     async function savePrices() {
       const bw = parseFloat(document.getElementById("priceBw").value);
@@ -392,6 +455,7 @@
     loadInfo();
     loadPrinters();
     loadJobs();
+    loadAutostart();
     setInterval(loadJobs, 2000);
   </script>
 </body>

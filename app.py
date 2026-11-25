@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import csv
 import io
 import logging
 import os
 import socket
+import subprocess
 import sys
 import threading
 import uuid
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import quote
 
 import qrcode
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -35,6 +39,11 @@ else:
 
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = Path("/tmp/qr_print_uploads") if os.environ.get("VERCEL") else RUNTIME_DIR / "uploads"
+BRANDING_DIR = Path("/tmp/qr_print_branding") if os.environ.get("VERCEL") else RUNTIME_DIR / "branding"
+BRANDING_DIR.mkdir(parents=True, exist_ok=True)
+LOGO_PATH = BRANDING_DIR / "shop_logo.png"
+if LOGO_PATH.exists():
+    pass
 
 MAX_FILE_SIZE_MB = 50
 MAX_FILES_PER_UPLOAD = 10
@@ -44,6 +53,7 @@ app = FastAPI(title="QR Print System", version="3.0.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 job_manager = PrintJobManager(upload_dir=UPLOAD_DIR)
+job_manager.has_logo = LOGO_PATH.exists()
 tunnel_manager = PublicTunnelManager()
 
 
@@ -72,6 +82,8 @@ class SettingsUpdate(BaseModel):
     auto_print: Optional[bool] = None
     custom_base_url: Optional[str] = None
     shop_name: Optional[str] = None
+    shop_phone: Optional[str] = None
+    upi_id: Optional[str] = None
     price_bw: Optional[float] = None
     price_color: Optional[float] = None
 
@@ -103,6 +115,9 @@ def server_info(request: Request):
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "shop_phone": job_manager.shop_phone,
+        "upi_id": job_manager.upi_id,
+        "has_logo": LOGO_PATH.exists(),
         "price_bw": job_manager.price_bw,
         "price_color": job_manager.price_color,
         "tunnel_status": tunnel_manager.status,
@@ -131,6 +146,10 @@ def update_settings(payload: SettingsUpdate):
         job_manager.custom_base_url = payload.custom_base_url.strip()
     if payload.shop_name is not None:
         job_manager.shop_name = payload.shop_name.strip()
+    if payload.shop_phone is not None:
+        job_manager.shop_phone = payload.shop_phone.strip()
+    if payload.upi_id is not None:
+        job_manager.upi_id = payload.upi_id.strip()
     if payload.price_bw is not None:
         job_manager.price_bw = max(0.0, round(float(payload.price_bw), 2))
     if payload.price_color is not None:
@@ -141,6 +160,9 @@ def update_settings(payload: SettingsUpdate):
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "shop_phone": job_manager.shop_phone,
+        "upi_id": job_manager.upi_id,
+        "has_logo": LOGO_PATH.exists(),
         "price_bw": job_manager.price_bw,
         "price_color": job_manager.price_color,
         "qr_url": get_qr_target_url(),
@@ -158,6 +180,108 @@ def generate_qr(request: Request, url: Optional[str] = None):
     img.save(buf, format="PNG")
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
+
+
+@app.get("/api/upi-qr")
+def generate_upi_qr(amount: float = 0.0, note: str = "QR Print"):
+    if not job_manager.upi_id:
+        raise HTTPException(400, "Shop UPI ID not configured.")
+    shop = quote(job_manager.shop_name or "QR Print Shop")
+    tn = quote(note)
+    upi_uri = f"upi://pay?pa={quote(job_manager.upi_id)}&pn={shop}&am={amount:.2f}&cu=INR&tn={tn}"
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=8, border=2)
+    qr.add_data(upi_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0f172a", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
+
+
+@app.post("/api/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    content = await file.read()
+    if not content or len(content) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Logo must be non-empty and under 5MB.")
+    LOGO_PATH.write_bytes(content)
+    job_manager.has_logo = True
+    return {"status": "ok", "has_logo": True}
+
+
+@app.get("/api/logo")
+def get_logo():
+    if not LOGO_PATH.exists():
+        raise HTTPException(404, "No logo uploaded.")
+    return FileResponse(LOGO_PATH)
+
+
+@app.get("/api/report/csv")
+def download_csv_report():
+    jobs = job_manager.list_jobs()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Token", "Time", "Customer", "File", "Color", "Sides", "Pages", "Copies", "Amount (INR)", "Status"])
+    total_bw_pages = 0
+    total_col_pages = 0
+    total_rev = 0.0
+    for j in jobs:
+        writer.writerow([
+            f"#{j.get('token', '')}", j.get("created_at", ""), j.get("customer_name", ""),
+            j.get("filename", ""), j.get("color_mode", ""), j.get("sides", ""),
+            j.get("selected_pages", 0), j.get("copies", 1), j.get("total_price", 0), j.get("status", ""),
+        ])
+        if j.get("status") == "printed":
+            pgs = int(j.get("selected_pages", 0)) * int(j.get("copies", 1))
+            if j.get("color_mode") == "bw":
+                total_bw_pages += pgs
+            else:
+                total_col_pages += pgs
+            total_rev += float(j.get("total_price", 0))
+    writer.writerow([])
+    writer.writerow(["SUMMARY", f"B&W Pages: {total_bw_pages}", f"Color Pages: {total_col_pages}", f"Total Revenue: INR {total_rev:.2f}"])
+    buf.seek(0)
+    filename = f"print_report_{datetime.now().strftime('%Y-%m-%d')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+def _startup_shortcut_path() -> Optional[Path]:
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    return Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "QR Print Shop.lnk"
+
+
+@app.get("/api/autostart")
+def get_autostart_status():
+    lnk = _startup_shortcut_path()
+    return {"supported": sys.platform == "win32" and lnk is not None, "enabled": bool(lnk and lnk.exists())}
+
+
+@app.post("/api/autostart")
+def toggle_autostart(enable: bool = True):
+    lnk = _startup_shortcut_path()
+    if sys.platform != "win32" or lnk is None:
+        raise HTTPException(400, "Auto-start is only supported on Windows.")
+    if not enable:
+        lnk.unlink(missing_ok=True)
+        return {"enabled": False}
+    target = str(RUNTIME_DIR / "start_server.bat")
+    if getattr(sys, "frozen", False):
+        target = sys.executable
+    ps_cmd = (
+        f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}');"
+        f"$s.TargetPath='{target}';"
+        f"$s.WorkingDirectory='{RUNTIME_DIR}';"
+        f"$s.WindowStyle=7;"
+        f"$s.Save()"
+    )
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd], check=True)
+    return {"enabled": lnk.exists()}
 
 
 @app.post("/api/inspect")

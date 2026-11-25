@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#3b82f6" />
+  <link rel="manifest" href="/static/manifest.json" />
   <title>Scan &amp; Print — Instant Print Shop</title>
   <style>
     :root {
@@ -183,8 +185,13 @@
 <body>
   <div class="container">
     <header>
-      <h1>🖨️ Scan &amp; Print</h1>
-      <p>Upload photos, PDFs, or Word files — prints automatically</p>
+      <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+        <button type="button" id="langBtn" style="background:#162032; border:1px solid #2b3950; color:#93c5fd; padding:4px 12px; border-radius:999px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+          🌐 हिन्दी
+        </button>
+      </div>
+      <h1 id="hdrTitle">🖨️ Scan &amp; Print</h1>
+      <p id="hdrSub">Upload photos, PDFs, or Word files — prints automatically</p>
       <div class="shop-badge" id="shopBadge">● Connecting...</div>
     </header>
 
@@ -307,8 +314,15 @@
   <div class="success-overlay" id="successOverlay">
     <div class="success-check">✓</div>
     <div class="success-text">
-      <h2>Sent to Printer!</h2>
+      <h2 id="successTitle">Sent to Printer!</h2>
       <p id="successDetail">Your files are printing automatically.</p>
+      <div id="upiBox" style="display:none; margin-top:14px; background:#162032; border:1px solid #2b3950; border-radius:14px; padding:14px; text-align:center;">
+        <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:8px;">Scan to Pay via UPI (GPay / PhonePe / Paytm)</div>
+        <img id="upiQrImg" src="" alt="UPI QR" style="width:160px; height:160px; background:#fff; padding:6px; border-radius:10px; display:block; margin:0 auto 10px;" />
+        <a id="upiPayLink" href="#" style="display:inline-block; padding:10px 20px; border-radius:10px; background:#22c55e; color:#052e16; font-weight:800; text-decoration:none; font-size:0.92rem;">
+          💳 Pay Now via UPI App
+        </a>
+      </div>
     </div>
     <button class="success-close" id="successClose">View Live Status / Print More</button>
   </div>
@@ -330,11 +344,51 @@
     let sidesMode = "one";
     let priceBw = 2;
     let priceColor = 10;
+    let shopUpiId = "";
+    let shopNameVal = "QR Print Shop";
+    let curLang = "en";
     let activeJobIds = [];
     let pollTimer = null;
 
+    const I18N = {
+      en: {
+        btn: "🌐 हिन्दी",
+        title: "🖨️ Scan & Print",
+        sub: "Upload photos, PDFs, or Word files — prints automatically",
+        drop: "Tap to select Photos, PDF, or Word",
+        submitEmpty: "Select files to print",
+        successTitle: "Sent to Printer!",
+        successClose: "View Live Status / Print More",
+      },
+      hi: {
+        btn: "🌐 English",
+        title: "🖨️ स्कैन और प्रिंट",
+        sub: "फोटो, PDF या Word अपलोड करें — अपने आप प्रिंट होगा",
+        drop: "फोटो, PDF या Word चुनने के लिए टैप करें",
+        submitEmpty: "प्रिंट करने के लिए फ़ाइल चुनें",
+        successTitle: "प्रिंटर पर भेज दिया गया!",
+        successClose: "लाइव स्टेटस देखें / और प्रिंट करें",
+      },
+    };
+
+    document.getElementById("langBtn").addEventListener("click", () => {
+      curLang = curLang === "en" ? "hi" : "en";
+      const t = I18N[curLang];
+      document.getElementById("langBtn").textContent = t.btn;
+      document.getElementById("hdrTitle").textContent = t.title;
+      document.getElementById("hdrSub").textContent = t.sub;
+      document.getElementById("successTitle").textContent = t.successTitle;
+      document.getElementById("successClose").textContent = t.successClose;
+      if (!selectedFiles.length) {
+        document.getElementById("dropText").textContent = t.drop;
+        submitBtn.textContent = t.submitEmpty;
+      }
+    });
+
     fetch("/api/info").then(r => r.json()).then(data => {
       const label = data.shop_name || data.active_printer || "Shop Printer";
+      shopNameVal = data.shop_name || "QR Print Shop";
+      shopUpiId = data.upi_id || "";
       const mode = data.auto_print ? "Auto-Print ON" : "Approval Mode";
       document.getElementById("shopBadge").textContent = `● ${label} • ${mode}`;
       if (typeof data.price_bw === "number") priceBw = data.price_bw;
@@ -558,6 +612,16 @@
         document.getElementById("successDetail").innerHTML =
           `<div style="font-size:1.5rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens}</div>` +
           `${count} file${count > 1 ? "s" : ""} sent to printer • Total: <strong>₹${totalAmt}</strong>`;
+        const upiBox = document.getElementById("upiBox");
+        if (shopUpiId && totalAmt > 0) {
+          const note = `Token ${tokens}`;
+          document.getElementById("upiQrImg").src = `/api/upi-qr?amount=${totalAmt}&note=${encodeURIComponent(note)}`;
+          document.getElementById("upiPayLink").href =
+            `upi://pay?pa=${encodeURIComponent(shopUpiId)}&pn=${encodeURIComponent(shopNameVal)}&am=${totalAmt.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+          upiBox.style.display = "block";
+        } else {
+          upiBox.style.display = "none";
+        }
         successOverlay.classList.add("show");
       } catch (err) {
         showError(err.message);
