@@ -48,6 +48,7 @@ class PrintJob:
     paper_size: str
     printer_name: str
     customer_name: str
+    upi_ref: str = ""
     status: str = "queued"
     message: str = "Waiting in queue..."
     pages_printed: int = 0
@@ -80,6 +81,7 @@ class PrintJobManager:
         self.registry_synced = False
         self.shop_phone = ""
         self.upi_id = ""
+        self.require_payment_verify = True
         self.has_logo = False
         self.price_bw: float = 2.0
         self.price_color: float = 10.0
@@ -125,6 +127,17 @@ class PrintJobManager:
             token_num = self._next_token
             self._next_token += 1
 
+        payment_required = bool(self.upi_id and total_price > 0)
+        if payment_required:
+            init_status = "awaiting_payment"
+            init_msg = f"Token #{token_num} • Pay ₹{total_price} to start printing"
+        elif self.auto_print:
+            init_status = "queued"
+            init_msg = f"Token #{token_num} → printing on {target}"
+        else:
+            init_status = "waiting_approval"
+            init_msg = "Waiting for approval"
+
         job = PrintJob(
             id=uuid.uuid4().hex[:10], token=token_num, filename=filename, file_path=str(file_path),
             file_size=file_path.stat().st_size, total_file_pages=total_pages,
@@ -136,16 +149,37 @@ class PrintJobManager:
             orientation=orientation if orientation in {"auto", "portrait", "landscape"} else "auto",
             paper_size=paper_size if paper_size in {"A4", "Letter", "Legal", "A3", "A5"} else "A4",
             printer_name=target, customer_name=customer_name.strip() or "Walk-in Customer",
-            status="queued" if self.auto_print else "waiting_approval",
-            message=f"Token #{token_num} → printing on {target}" if self.auto_print else "Waiting for approval",
+            status=init_status,
+            message=init_msg,
         )
         with self._lock:
             self._jobs[job.id] = job
             self._order.insert(0, job.id)
-            self._new_job_event.set()
-        if self.auto_print:
+            if not payment_required:
+                self._new_job_event.set()
+        if not payment_required and self.auto_print:
             self._queue.put(job.id)
         return job
+
+    def customer_mark_paid(self, job_id: str, upi_ref: str = "") -> PrintJob:
+        should_queue = False
+        with self._lock:
+            j = self._jobs.get(job_id)
+            if not j:
+                raise KeyError("Job not found")
+            j.upi_ref = upi_ref.strip()
+            self._new_job_event.set()
+            if self.auto_print and not self.require_payment_verify:
+                j.status = "queued"
+                j.message = f"Payment confirmed → printing on {j.printer_name}"
+                should_queue = True
+            else:
+                j.status = "payment_confirming"
+                ref_txt = f" (Ref: {j.upi_ref})" if j.upi_ref else ""
+                j.message = f"Customer paid ₹{j.total_price}{ref_txt} — click ✓ Print to verify"
+        if should_queue:
+            self._queue.put(job_id)
+        return j
 
     def list_jobs(self) -> List[dict]:
         with self._lock:

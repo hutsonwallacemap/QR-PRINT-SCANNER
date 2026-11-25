@@ -106,6 +106,7 @@ class SettingsUpdate(BaseModel):
     registry_url: Optional[str] = None
     shop_phone: Optional[str] = None
     upi_id: Optional[str] = None
+    require_payment_verify: Optional[bool] = None
     price_bw: Optional[float] = None
     price_color: Optional[float] = None
 
@@ -142,6 +143,7 @@ def server_info(request: Request):
         "is_permanent_qr": bool(job_manager.registry_synced and job_manager.registry_url and job_manager.shop_id),
         "shop_phone": job_manager.shop_phone,
         "upi_id": job_manager.upi_id,
+        "require_payment_verify": job_manager.require_payment_verify,
         "has_logo": LOGO_PATH.exists(),
         "price_bw": job_manager.price_bw,
         "price_color": job_manager.price_color,
@@ -184,6 +186,8 @@ def update_settings(payload: SettingsUpdate):
         job_manager.shop_phone = payload.shop_phone.strip()
     if payload.upi_id is not None:
         job_manager.upi_id = payload.upi_id.strip()
+    if payload.require_payment_verify is not None:
+        job_manager.require_payment_verify = payload.require_payment_verify
     if payload.price_bw is not None:
         job_manager.price_bw = max(0.0, round(float(payload.price_bw), 2))
     if payload.price_color is not None:
@@ -199,6 +203,7 @@ def update_settings(payload: SettingsUpdate):
         "is_permanent_qr": bool(job_manager.registry_synced and job_manager.registry_url and job_manager.shop_id),
         "shop_phone": job_manager.shop_phone,
         "upi_id": job_manager.upi_id,
+        "require_payment_verify": job_manager.require_payment_verify,
         "has_logo": LOGO_PATH.exists(),
         "price_bw": job_manager.price_bw,
         "price_color": job_manager.price_color,
@@ -423,6 +428,19 @@ def get_job(job_id: str):
 def reprint_job(job_id: str):
     try:
         job = job_manager.approve_or_reprint(job_id)
+        return {"status": "ok", "job": job.to_dict()}
+    except KeyError:
+        raise HTTPException(404, "Job not found")
+
+
+class CustomerPaidPayload(BaseModel):
+    upi_ref: str = ""
+
+
+@app.post("/api/jobs/{job_id}/customer-paid")
+def customer_paid(job_id: str, payload: CustomerPaidPayload):
+    try:
+        job = job_manager.customer_mark_paid(job_id, payload.upi_ref)
         return {"status": "ok", "job": job.to_dict()}
     except KeyError:
         raise HTTPException(404, "Job not found")

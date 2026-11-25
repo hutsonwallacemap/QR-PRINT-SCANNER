@@ -89,7 +89,8 @@
     .badge.queued, .badge.printing { background: rgba(245,158,11,0.2); color: #fcd34d; }
     .badge.printed { background: rgba(34,197,94,0.2); color: #86efac; }
     .badge.failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
-    .badge.waiting_approval { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .badge.waiting_approval, .badge.awaiting_payment { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .badge.payment_confirming { background: rgba(245,158,11,0.25); color: #fde047; }
     .job-msg { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
     .empty-state { text-align: center; padding: 32px; color: var(--muted); }
     .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; }
@@ -192,6 +193,17 @@
 
           <div class="toggle-row">
             <div class="toggle-label">
+              <strong>Verify UPI Payment Before Print</strong>
+              <small>Hold paid jobs for 1-click verify (ON = safest)</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="verifyPayToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-label">
               <strong>Start with Windows</strong>
               <small>Auto-launch silently when PC turns on</small>
             </div>
@@ -258,6 +270,7 @@
         const data = await res.json();
         document.getElementById("qrUrl").textContent = data.qr_url;
         document.getElementById("autoPrintToggle").checked = data.auto_print;
+        document.getElementById("verifyPayToggle").checked = data.require_payment_verify !== false;
         document.getElementById("customUrl").value = data.custom_base_url || "";
         document.getElementById("shopId").value = data.shop_id || "";
         document.getElementById("shopName").value = data.shop_name || "";
@@ -318,6 +331,13 @@
       await fetch("/api/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auto_print: e.target.checked }),
+      });
+    });
+
+    document.getElementById("verifyPayToggle").addEventListener("change", async e => {
+      await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ require_payment_verify: e.target.checked }),
       });
     });
 
@@ -451,7 +471,7 @@
             </td>
             <td>
               <div style="display:flex; gap:5px;">
-                <button class="btn btn-success" onclick="reprintJob('${j.id}')">${j.status === "waiting_approval" ? "✓ Print" : "↻"}</button>
+                <button class="btn btn-success" onclick="reprintJob('${j.id}')">${j.status === "payment_confirming" ? "💳 Verify & Print" : (j.status === "waiting_approval" ? "✓ Print" : "↻")}</button>
                 <button class="btn btn-danger" onclick="deleteJob('${j.id}')">✕</button>
               </div>
             </td>

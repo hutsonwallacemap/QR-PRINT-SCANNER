@@ -306,17 +306,24 @@
     </div>
   </div>
 
-  <div class="success-overlay" id="successOverlay">
-    <div class="success-check">✓</div>
-    <div class="success-text">
+  <div class="success-overlay" id="successOverlay" style="overflow-y:auto;">
+    <div class="success-check" id="overlayIcon">✓</div>
+    <div class="success-text" style="width:100%; max-width:400px;">
       <h2 id="successTitle">Sent to Printer!</h2>
       <p id="successDetail">Your files are printing automatically.</p>
       <div id="upiBox" style="display:none; margin-top:14px; background:#162032; border:1px solid #2b3950; border-radius:14px; padding:14px; text-align:center;">
-        <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:8px;">Scan to Pay via UPI (GPay / PhonePe / Paytm)</div>
-        <img id="upiQrImg" src="" alt="UPI QR" style="width:160px; height:160px; background:#fff; padding:6px; border-radius:10px; display:block; margin:0 auto 10px;" />
-        <a id="upiPayLink" href="#" style="display:inline-block; padding:10px 20px; border-radius:10px; background:#22c55e; color:#052e16; font-weight:800; text-decoration:none; font-size:0.92rem;">
-          💳 Pay Now via UPI App
-        </a>
+        <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:8px;">Pay first to start printing:</div>
+        <img id="upiQrImg" src="" alt="UPI QR" style="width:150px; height:150px; background:#fff; padding:6px; border-radius:10px; display:block; margin:0 auto 10px;" />
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+          <a id="gpayLink" href="#" style="padding:10px 8px; border-radius:10px; background:#1e293b; border:1px solid #334155; color:#fff; font-weight:700; text-decoration:none; font-size:0.84rem;">GPay</a>
+          <a id="phonepeLink" href="#" style="padding:10px 8px; border-radius:10px; background:#5f259f; color:#fff; font-weight:700; text-decoration:none; font-size:0.84rem;">PhonePe</a>
+          <a id="paytmLink" href="#" style="padding:10px 8px; border-radius:10px; background:#00baf2; color:#042f4b; font-weight:700; text-decoration:none; font-size:0.84rem;">Paytm</a>
+          <a id="allUpiLink" href="#" style="padding:10px 8px; border-radius:10px; background:#22c55e; color:#052e16; font-weight:700; text-decoration:none; font-size:0.84rem;">All UPI Apps</a>
+        </div>
+        <input type="text" id="upiRefInput" placeholder="Optional: Last 4 digits / UTR ref" style="margin-bottom:8px; font-size:0.84rem;" />
+        <button type="button" id="confirmPaidBtn" style="width:100%; padding:12px; border:none; border-radius:10px; background:#3b82f6; color:#fff; font-weight:800; font-size:0.95rem; cursor:pointer;">
+          ✅ I Have Paid — Send to Printer
+        </button>
       </div>
     </div>
     <button class="success-close" id="successClose">View Live Status / Print More</button>
@@ -568,17 +575,32 @@
 
         const tokens = data.jobs.map(j => `#${j.token}`).join(", ");
         const totalAmt = data.jobs.reduce((acc, j) => acc + (j.total_price || 0), 0);
-        document.getElementById("successDetail").innerHTML =
-          `<div style="font-size:1.5rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens}</div>` +
-          `${count} file${count > 1 ? "s" : ""} sent to printer • Total: <strong>₹${totalAmt}</strong>`;
         const upiBox = document.getElementById("upiBox");
-        if (shopUpiId && totalAmt > 0) {
+        const needsPay = data.jobs.some(j => j.status === "awaiting_payment");
+
+        if (needsPay && shopUpiId && totalAmt > 0) {
+          document.getElementById("overlayIcon").textContent = "💳";
+          document.getElementById("successTitle").textContent = "Complete Payment to Print";
+          document.getElementById("successDetail").innerHTML =
+            `<div style="font-size:1.45rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens} • ₹${totalAmt}</div>` +
+            `Printing starts only after payment is completed.`;
           const note = `Token ${tokens}`;
+          const params = `pa=${encodeURIComponent(shopUpiId)}&pn=${encodeURIComponent(shopNameVal)}&am=${totalAmt.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
           document.getElementById("upiQrImg").src = `/api/upi-qr?amount=${totalAmt}&note=${encodeURIComponent(note)}`;
-          document.getElementById("upiPayLink").href =
-            `upi://pay?pa=${encodeURIComponent(shopUpiId)}&pn=${encodeURIComponent(shopNameVal)}&am=${totalAmt.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+          document.getElementById("gpayLink").href = `tez://upi/pay?${params}`;
+          document.getElementById("phonepeLink").href = `phonepe://pay?${params}`;
+          document.getElementById("paytmLink").href = `paytmmp://pay?${params}`;
+          const isAndroid = /android/i.test(navigator.userAgent);
+          document.getElementById("allUpiLink").href = isAndroid
+            ? `intent://pay?${params}#Intent;scheme=upi;end`
+            : `upi://pay?${params}`;
           upiBox.style.display = "block";
         } else {
+          document.getElementById("overlayIcon").textContent = "✓";
+          document.getElementById("successTitle").textContent = "Sent to Printer!";
+          document.getElementById("successDetail").innerHTML =
+            `<div style="font-size:1.5rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens}</div>` +
+            `${count} file${count > 1 ? "s" : ""} sent to printer • Total: <strong>₹${totalAmt}</strong>`;
           upiBox.style.display = "none";
         }
         successOverlay.classList.add("show");
@@ -587,6 +609,34 @@
       } finally {
         submitBtn.disabled = !selectedFiles.length;
         if (!selectedFiles.length) submitBtn.textContent = "Select files to print";
+      }
+    });
+
+    document.getElementById("confirmPaidBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("confirmPaidBtn");
+      const ref = document.getElementById("upiRefInput").value || "";
+      btn.disabled = true;
+      btn.textContent = "⏳ Confirming & Sending to Printer...";
+      try {
+        await Promise.all(
+          activeJobIds.map(id =>
+            fetch(`/api/jobs/${id}/customer-paid`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ upi_ref: ref }),
+            })
+          )
+        );
+        document.getElementById("upiBox").style.display = "none";
+        document.getElementById("overlayIcon").textContent = "✓";
+        document.getElementById("successTitle").textContent = "Payment Submitted!";
+        document.getElementById("successDetail").textContent = "Your print job has been sent to the shop system.";
+        startPolling();
+      } catch {
+        showError("Could not confirm payment. Please try again.");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "✅ I Have Paid — Send to Printer";
       }
     });
 
