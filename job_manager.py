@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import queue
+import socket
 import threading
 import time
 import uuid
@@ -73,12 +75,21 @@ class PrintJobManager:
         self.active_printer: Optional[str] = get_default_printer()
         self.custom_base_url = ""
         self.shop_name = ""
+        self.shop_id = self._default_shop_id()
+        self.registry_url = os.environ.get("QR_REGISTRY_URL", "https://qr-print-scanner-alpha.vercel.app")
+        self.registry_synced = False
         self.shop_phone = ""
         self.upi_id = ""
         self.has_logo = False
         self.price_bw: float = 2.0
         self.price_color: float = 10.0
         self._next_token: int = 101
+
+    @staticmethod
+    def _default_shop_id() -> str:
+        host = socket.gethostname().lower()
+        clean = "".join(ch if ch.isalnum() else "-" for ch in host).strip("-")
+        return f"shop-{clean[:18]}" if clean else f"shop-{uuid.uuid4().hex[:6]}"
         self._stop = threading.Event()
         threading.Thread(target=self._worker, daemon=True).start()
         threading.Thread(target=self._cleanup, daemon=True).start()

@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from datetime import datetime
@@ -19,12 +20,13 @@ from urllib.parse import quote
 
 import qrcode
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from job_manager import PrintJobManager
 from printer_engine import ALL_EXTENSIONS, count_file_pages, list_printers, parse_page_range
+from registry import get_shop_route, normalize_shop_id, save_shop_route, send_heartbeat
 from tunnel import PublicTunnelManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -70,6 +72,8 @@ def get_local_ip() -> str:
 
 
 def get_qr_target_url(request: Optional[Request] = None) -> str:
+    if job_manager.registry_synced and job_manager.registry_url and job_manager.shop_id:
+        return f"{job_manager.registry_url.rstrip('/')}/s/{job_manager.shop_id}"
     if job_manager.custom_base_url:
         return job_manager.custom_base_url.rstrip("/")
     if os.environ.get("VERCEL") and request is not None:
@@ -77,11 +81,29 @@ def get_qr_target_url(request: Optional[Request] = None) -> str:
     return f"http://{get_local_ip()}:{SERVER_PORT}"
 
 
+def _sync_registry_now() -> None:
+    if os.environ.get("VERCEL"):
+        return
+    live_url = job_manager.custom_base_url
+    if not live_url or "trycloudflare.com" not in live_url:
+        return
+    ok = send_heartbeat(
+        job_manager.registry_url,
+        job_manager.shop_id,
+        live_url,
+        job_manager.shop_name,
+    )
+    if ok:
+        job_manager.registry_synced = True
+
+
 class SettingsUpdate(BaseModel):
     active_printer: Optional[str] = None
     auto_print: Optional[bool] = None
     custom_base_url: Optional[str] = None
     shop_name: Optional[str] = None
+    shop_id: Optional[str] = None
+    registry_url: Optional[str] = None
     shop_phone: Optional[str] = None
     upi_id: Optional[str] = None
     price_bw: Optional[float] = None
@@ -115,6 +137,9 @@ def server_info(request: Request):
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "shop_id": job_manager.shop_id,
+        "registry_url": job_manager.registry_url,
+        "is_permanent_qr": bool(job_manager.registry_synced and job_manager.registry_url and job_manager.shop_id),
         "shop_phone": job_manager.shop_phone,
         "upi_id": job_manager.upi_id,
         "has_logo": LOGO_PATH.exists(),
@@ -146,6 +171,15 @@ def update_settings(payload: SettingsUpdate):
         job_manager.custom_base_url = payload.custom_base_url.strip()
     if payload.shop_name is not None:
         job_manager.shop_name = payload.shop_name.strip()
+    if payload.shop_id is not None:
+        clean_id = normalize_shop_id(payload.shop_id)
+        if len(clean_id) < 2:
+            raise HTTPException(400, "Shop ID must be at least 2 characters (letters/numbers/hyphens).")
+        job_manager.shop_id = clean_id
+        threading.Thread(target=_sync_registry_now, daemon=True).start()
+    if payload.registry_url is not None:
+        job_manager.registry_url = payload.registry_url.strip().rstrip("/")
+        threading.Thread(target=_sync_registry_now, daemon=True).start()
     if payload.shop_phone is not None:
         job_manager.shop_phone = payload.shop_phone.strip()
     if payload.upi_id is not None:
@@ -160,6 +194,9 @@ def update_settings(payload: SettingsUpdate):
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "shop_id": job_manager.shop_id,
+        "registry_url": job_manager.registry_url,
+        "is_permanent_qr": bool(job_manager.registry_synced and job_manager.registry_url and job_manager.shop_id),
         "shop_phone": job_manager.shop_phone,
         "upi_id": job_manager.upi_id,
         "has_logo": LOGO_PATH.exists(),
@@ -397,14 +434,58 @@ def delete_job(job_id: str):
     return {"status": "deleted"}
 
 
+class HeartbeatPayload(BaseModel):
+    shop_id: str
+    target_url: str
+    shop_name: str = ""
+
+
+@app.post("/api/registry/heartbeat")
+def registry_heartbeat(payload: HeartbeatPayload):
+    try:
+        rec = save_shop_route(payload.shop_id, payload.target_url, payload.shop_name)
+        return {"status": "ok", "route": rec}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/s/{shop_id}")
+def redirect_permanent_qr(shop_id: str):
+    rec = get_shop_route(shop_id)
+    if rec and rec.get("target_url"):
+        return RedirectResponse(url=rec["target_url"], status_code=307)
+    return HTMLResponse(
+        content=f"""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Shop Offline</title></head><body style="font-family:sans-serif;background:#0b1120;color:#f8fafc;
+        display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center;">
+        <div style="max-width:400px;background:#162032;border:1px solid #2b3950;border-radius:16px;padding:28px;">
+        <div style="font-size:2.5rem;">🖨️</div>
+        <h2 style="margin:10px 0 6px;">Shop Printer Offline</h2>
+        <p style="color:#94a3b8;font-size:0.95rem;">Shop <code>{shop_id}</code> is not connected right now.
+        Please ask the shopkeeper to open <b>QR Print Shop</b> on their PC.</p>
+        <button onclick="location.reload()" style="margin-top:14px;padding:10px 22px;border-radius:10px;
+        border:0;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer;">Retry</button>
+        </div></body></html>""",
+        status_code=503,
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting QR Print Server on http://%s:%d", get_local_ip(), SERVER_PORT)
     if os.environ.get("DISABLE_TUNNEL") != "1" and not os.environ.get("VERCEL"):
         def _on_tunnel_url(url: str):
-            if not job_manager.custom_base_url:
+            if not job_manager.custom_base_url or "trycloudflare.com" in job_manager.custom_base_url:
                 job_manager.custom_base_url = url
+                threading.Thread(target=_sync_registry_now, daemon=True).start()
+
+        def _heartbeat_loop():
+            while True:
+                time.sleep(45)
+                _sync_registry_now()
+
         tunnel_manager.start(SERVER_PORT, _on_tunnel_url)
+        threading.Thread(target=_heartbeat_loop, daemon=True).start()
     if getattr(sys, "frozen", False) or os.environ.get("OPEN_ADMIN_BROWSER") == "1":
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{SERVER_PORT}/admin")).start()
     uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)

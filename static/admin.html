@@ -130,6 +130,14 @@
 
         <div class="card" style="margin-top:16px;">
           <div class="field" style="margin-top:0;">
+            <label>Permanent Shop ID (for fixed QR sticker)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="shopId" placeholder="e.g. ravi-xerox" />
+              <button class="btn btn-primary" onclick="saveShopId()">Save</button>
+            </div>
+          </div>
+
+          <div class="field">
             <label>Shop Name &amp; Phone (shown on Poster)</label>
             <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px;">
               <input type="text" id="shopName" placeholder="Shop Name" />
@@ -251,6 +259,7 @@
         document.getElementById("qrUrl").textContent = data.qr_url;
         document.getElementById("autoPrintToggle").checked = data.auto_print;
         document.getElementById("customUrl").value = data.custom_base_url || "";
+        document.getElementById("shopId").value = data.shop_id || "";
         document.getElementById("shopName").value = data.shop_name || "";
         document.getElementById("shopPhone").value = data.shop_phone || "";
         document.getElementById("upiId").value = data.upi_id || "";
@@ -259,7 +268,10 @@
 
         const badge = document.getElementById("networkBadge");
         badge.className = "network-badge";
-        if (data.is_public) {
+        if (data.is_permanent_qr) {
+          badge.textContent = "🔗 Permanent QR Sticker Active (4G/5G + Wi-Fi)";
+          badge.classList.add("public");
+        } else if (data.is_public) {
           badge.textContent = "🌐 Public Mode — 4G/5G + Wi-Fi";
           badge.classList.add("public");
         } else if (data.tunnel_status === "starting") {
@@ -318,6 +330,17 @@
       const data = await res.json();
       document.getElementById("qrUrl").textContent = data.qr_url;
       document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
+    }
+
+    async function saveShopId() {
+      const sid = document.getElementById("shopId").value;
+      const res = await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop_id: sid }),
+      });
+      if (res.ok) {
+        setTimeout(loadInfo, 800);
+      }
     }
 
     async function saveShopInfo() {
