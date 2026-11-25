@@ -33,7 +33,11 @@ logger = logging.getLogger("qr_print.app")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR = (
+    Path("/tmp/qr_print_uploads")
+    if os.environ.get("VERCEL")
+    else BASE_DIR / "uploads"
+)
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS | TEXT_EXTENSIONS
 
 SERVER_PORT = int(os.environ.get("QR_PRINT_PORT", "8500"))
@@ -60,6 +64,8 @@ def get_local_ip() -> str:
 def get_qr_target_url(request: Optional[Request] = None) -> str:
     if job_manager.custom_base_url:
         return job_manager.custom_base_url.rstrip("/")
+    if os.environ.get("VERCEL") and request is not None:
+        return str(request.base_url).rstrip("/")
     ip = get_local_ip()
     return f"http://{ip}:{SERVER_PORT}"
 
@@ -130,8 +136,8 @@ def update_settings(payload: SettingsUpdate) -> dict:
 
 
 @app.get("/api/qr")
-def generate_qr(url: Optional[str] = None) -> StreamingResponse:
-    target = (url or get_qr_target_url()).strip()
+def generate_qr(request: Request, url: Optional[str] = None) -> StreamingResponse:
+    target = (url or get_qr_target_url(request)).strip()
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,

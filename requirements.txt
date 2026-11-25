@@ -4,4 +4,4 @@ python-multipart>=0.0.9
 qrcode[pil]>=7.4.2
 pillow>=10.4.0
 pymupdf>=1.24.0
-pywin32>=306
+pywin32>=306; sys_platform == "win32"
