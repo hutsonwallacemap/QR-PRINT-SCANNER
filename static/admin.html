@@ -137,9 +137,12 @@
       <div class="card">
         <div class="qr-box">
           <img id="qrImg" src="/api/qr" alt="QR Code" />
+          <div id="networkBadge" style="margin-top:10px; font-size:0.82rem; font-weight:700; color:#93c5fd;">
+            Checking network mode...
+          </div>
           <div class="url-box" id="qrUrl">Loading...</div>
           <p style="color:var(--muted); font-size:0.82rem; margin:8px 0 0;">
-            Customers on the same Wi-Fi scan this QR code to upload &amp; print.
+            Customers scan this QR code on 4G/5G mobile data or Wi-Fi to upload &amp; print.
           </p>
         </div>
 
@@ -194,12 +197,31 @@
   </div>
 
   <script>
+    let lastQrUrl = "";
     async function loadInfo() {
       const res = await fetch("/api/info");
       const data = await res.json();
       document.getElementById("qrUrl").textContent = data.qr_url;
       document.getElementById("autoPrintToggle").checked = data.auto_print;
       document.getElementById("customUrl").value = data.custom_base_url || "";
+
+      const badge = document.getElementById("networkBadge");
+      if (data.is_public) {
+        badge.textContent = "🌐 Public 4G/5G + Wi-Fi Mode Active";
+        badge.style.color = "#86efac";
+      } else if (data.tunnel_status === "starting") {
+        badge.textContent = "⏳ Starting Public 4G/5G Tunnel...";
+        badge.style.color = "#fcd34d";
+        setTimeout(loadInfo, 2000);
+      } else {
+        badge.textContent = "📶 Local Wi-Fi Mode Only";
+        badge.style.color = "#93c5fd";
+      }
+
+      if (lastQrUrl && lastQrUrl !== data.qr_url) {
+        document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
+      }
+      lastQrUrl = data.qr_url;
     }
 
     async function loadPrinters() {

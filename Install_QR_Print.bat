@@ -22,6 +22,12 @@ if not exist ".venv\Scripts\python.exe" (
     echo [1/2] Environment already ready.
 )
 
+where cloudflared >nul 2>&1
+if errorlevel 1 (
+    echo Installing Cloudflare Tunnel for 4G/5G mobile data access...
+    winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements >nul 2>&1
+)
+
 echo [3/3] Creating "QR Print Shop" shortcut on your Desktop...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\QR Print Shop.lnk'); $s.TargetPath='%~dp0start_server.bat'; $s.WorkingDirectory='%~dp0'; $s.IconLocation='shell32.dll,16'; $s.Save()"
 

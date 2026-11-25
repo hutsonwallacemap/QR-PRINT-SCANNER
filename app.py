@@ -27,6 +27,7 @@ from printer_engine import (
     list_printers,
     parse_page_range,
 )
+from tunnel import PublicTunnelManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +56,7 @@ app = FastAPI(title="Universal QR Print System", version="1.0.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 job_manager = PrintJobManager(upload_dir=UPLOAD_DIR)
+tunnel_manager = PublicTunnelManager()
 
 
 def get_local_ip() -> str:
@@ -102,13 +104,16 @@ def qr_poster_page() -> FileResponse:
 
 @app.get("/api/info")
 def server_info(request: Request) -> dict:
+    qr_url = get_qr_target_url(request)
     return {
         "local_ip": get_local_ip(),
         "port": SERVER_PORT,
-        "qr_url": get_qr_target_url(request),
+        "qr_url": qr_url,
         "active_printer": job_manager.active_printer,
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
+        "tunnel_status": tunnel_manager.status,
+        "is_public": bool(job_manager.custom_base_url or os.environ.get("VERCEL")),
         "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
     }
 
@@ -263,6 +268,13 @@ if __name__ == "__main__":
     import uvicorn
 
     logger.info("Starting QR Print Server on http://%s:%d", get_local_ip(), SERVER_PORT)
+    if os.environ.get("DISABLE_TUNNEL") != "1" and not os.environ.get("VERCEL"):
+        def _on_tunnel_url(url: str) -> None:
+            if not job_manager.custom_base_url:
+                job_manager.custom_base_url = url
+
+        tunnel_manager.start(SERVER_PORT, _on_tunnel_url)
+
     if getattr(sys, "frozen", False) or os.environ.get("OPEN_ADMIN_BROWSER") == "1":
         threading.Timer(
             1.5, lambda: webbrowser.open(f"http://localhost:{SERVER_PORT}/admin")
