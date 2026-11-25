@@ -86,15 +86,15 @@ class PrintJobManager:
         self.price_bw: float = 2.0
         self.price_color: float = 10.0
         self._next_token: int = 101
+        self._stop = threading.Event()
+        threading.Thread(target=self._worker, daemon=True).start()
+        threading.Thread(target=self._cleanup, daemon=True).start()
 
     @staticmethod
     def _default_shop_id() -> str:
         host = socket.gethostname().lower()
         clean = "".join(ch if ch.isalnum() else "-" for ch in host).strip("-")
         return f"shop-{clean[:18]}" if clean else f"shop-{uuid.uuid4().hex[:6]}"
-        self._stop = threading.Event()
-        threading.Thread(target=self._worker, daemon=True).start()
-        threading.Thread(target=self._cleanup, daemon=True).start()
 
     @property
     def has_new_job(self) -> bool:
