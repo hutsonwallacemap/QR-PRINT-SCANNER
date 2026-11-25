@@ -6,7 +6,10 @@ import io
 import logging
 import os
 import socket
+import sys
+import threading
 import uuid
+import webbrowser
 from pathlib import Path
 from typing import List, Optional
 
@@ -31,12 +34,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("qr_print.app")
 
-BASE_DIR = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    RUNTIME_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+    RUNTIME_DIR = BASE_DIR
+
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = (
     Path("/tmp/qr_print_uploads")
     if os.environ.get("VERCEL")
-    else BASE_DIR / "uploads"
+    else RUNTIME_DIR / "uploads"
 )
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS | TEXT_EXTENSIONS
 
@@ -254,4 +263,8 @@ if __name__ == "__main__":
     import uvicorn
 
     logger.info("Starting QR Print Server on http://%s:%d", get_local_ip(), SERVER_PORT)
+    if getattr(sys, "frozen", False) or os.environ.get("OPEN_ADMIN_BROWSER") == "1":
+        threading.Timer(
+            1.5, lambda: webbrowser.open(f"http://localhost:{SERVER_PORT}/admin")
+        ).start()
     uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)
