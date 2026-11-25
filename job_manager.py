@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import queue
 import threading
 import time
@@ -12,7 +13,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from printer_engine import PrintOptions, count_file_pages, get_default_printer, print_file_to_windows_printer
+from printer_engine import (
+    PrintOptions,
+    count_file_pages,
+    get_default_printer,
+    parse_page_range,
+    print_file_to_windows_printer,
+)
 
 logger = logging.getLogger("qr_print.jobs")
 
@@ -23,10 +30,14 @@ FILE_EXPIRY_SECONDS = 3600
 @dataclass
 class PrintJob:
     id: str
+    token: int
     filename: str
     file_path: str
     file_size: int
     total_file_pages: int
+    selected_pages: int
+    sheets_count: int
+    total_price: float
     color_mode: str
     sides: str
     page_range: str
@@ -62,6 +73,9 @@ class PrintJobManager:
         self.active_printer: Optional[str] = get_default_printer()
         self.custom_base_url = ""
         self.shop_name = ""
+        self.price_bw: float = 2.0
+        self.price_color: float = 10.0
+        self._next_token: int = 101
         self._stop = threading.Event()
         threading.Thread(target=self._worker, daemon=True).start()
         threading.Thread(target=self._cleanup, daemon=True).start()
@@ -78,22 +92,38 @@ class PrintJobManager:
                    orientation: str = "auto", paper_size: str = "A4",
                    printer_name: Optional[str] = None, customer_name: str = "Walk-in Customer") -> PrintJob:
         total_pages = count_file_pages(file_path)
+        clean_range = page_range.strip() or "all"
+        selected_indices = parse_page_range(clean_range, total_pages)
+        selected_count = len(selected_indices)
+        clean_copies = max(1, min(99, int(copies)))
+        clean_color = "bw" if color_mode == "bw" else "color"
+        clean_sides = sides if sides in {"one", "both", "both-short"} else "one"
+        rate = self.price_bw if clean_color == "bw" else self.price_color
+        total_price = round(selected_count * clean_copies * rate, 2)
+        per_sheet = 2 if clean_sides in {"both", "both-short"} else 1
+        sheets_count = math.ceil(selected_count / per_sheet) * clean_copies
+
         target = printer_name or self.active_printer or get_default_printer()
         if not target:
             raise RuntimeError("No printer configured.")
 
+        with self._lock:
+            token_num = self._next_token
+            self._next_token += 1
+
         job = PrintJob(
-            id=uuid.uuid4().hex[:10], filename=filename, file_path=str(file_path),
+            id=uuid.uuid4().hex[:10], token=token_num, filename=filename, file_path=str(file_path),
             file_size=file_path.stat().st_size, total_file_pages=total_pages,
-            color_mode="bw" if color_mode == "bw" else "color",
-            sides=sides if sides in {"one", "both", "both-short"} else "one",
-            page_range=page_range.strip() or "all",
-            copies=max(1, min(99, int(copies))),
+            selected_pages=selected_count, sheets_count=sheets_count, total_price=total_price,
+            color_mode=clean_color,
+            sides=clean_sides,
+            page_range=clean_range,
+            copies=clean_copies,
             orientation=orientation if orientation in {"auto", "portrait", "landscape"} else "auto",
             paper_size=paper_size if paper_size in {"A4", "Letter", "Legal", "A3", "A5"} else "A4",
             printer_name=target, customer_name=customer_name.strip() or "Walk-in Customer",
             status="queued" if self.auto_print else "waiting_approval",
-            message=f"Accepted → printing on {target}" if self.auto_print else "Waiting for approval",
+            message=f"Token #{token_num} → printing on {target}" if self.auto_print else "Waiting for approval",
         )
         with self._lock:
             self._jobs[job.id] = job

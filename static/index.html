@@ -210,8 +210,8 @@
         <div class="opt-group">
           <div class="opt-label"><span>Color Mode</span></div>
           <div class="seg-group">
-            <button type="button" class="seg-btn active" data-color="color">🎨 Color</button>
-            <button type="button" class="seg-btn" data-color="bw">⬛ Black &amp; White</button>
+            <button type="button" class="seg-btn active" data-color="color" id="colorBtn">🎨 Color</button>
+            <button type="button" class="seg-btn" data-color="bw" id="bwBtn">⬛ Black &amp; White</button>
           </div>
         </div>
 
@@ -278,6 +278,14 @@
         </div>
       </div>
 
+      <div id="priceSummary" style="display:none; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:14px; padding:12px 16px; margin-bottom:12px; display:none; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:0.78rem; color:#94a3b8;">Estimated Total</div>
+          <div id="priceBreakdown" style="font-size:0.82rem; color:#cbd5e1;"></div>
+        </div>
+        <div id="priceTotal" style="font-size:1.45rem; font-weight:800; color:#86efac;">₹0</div>
+      </div>
+
       <button type="submit" class="submit-btn" id="submitBtn" disabled>
         Select files to print
       </button>
@@ -320,6 +328,8 @@
     let filePagesMap = new WeakMap();
     let colorMode = "color";
     let sidesMode = "one";
+    let priceBw = 2;
+    let priceColor = 10;
     let activeJobIds = [];
     let pollTimer = null;
 
@@ -327,15 +337,21 @@
       const label = data.shop_name || data.active_printer || "Shop Printer";
       const mode = data.auto_print ? "Auto-Print ON" : "Approval Mode";
       document.getElementById("shopBadge").textContent = `● ${label} • ${mode}`;
+      if (typeof data.price_bw === "number") priceBw = data.price_bw;
+      if (typeof data.price_color === "number") priceColor = data.price_color;
+      document.getElementById("colorBtn").textContent = `🎨 Color (₹${priceColor}/pg)`;
+      document.getElementById("bwBtn").textContent = `⬛ B&W (₹${priceBw}/pg)`;
+      updatePriceSummary();
     }).catch(() => {
       document.getElementById("shopBadge").textContent = "● Connected";
     });
 
-    document.querySelectorAll("[data-color]").forEach(btn => {
+      document.querySelectorAll("[data-color]").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("[data-color]").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         colorMode = btn.dataset.color;
+        updatePriceSummary();
       });
     });
 
@@ -364,11 +380,14 @@
     document.getElementById("decCopies").onclick = () => {
       const el = document.getElementById("copies");
       el.value = Math.max(1, (parseInt(el.value, 10) || 1) - 1);
+      updatePriceSummary();
     };
     document.getElementById("incCopies").onclick = () => {
       const el = document.getElementById("copies");
       el.value = Math.min(99, (parseInt(el.value, 10) || 1) + 1);
+      updatePriceSummary();
     };
+    document.getElementById("copies").addEventListener("input", updatePriceSummary);
 
     document.getElementById("advToggle").addEventListener("click", () => {
       document.getElementById("advBody").classList.toggle("open");
@@ -467,6 +486,33 @@
       submitBtn.textContent = hasFiles
         ? `🖨️ Print ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}${allKnown ? ` (${totalPages} pg)` : ""} Now`
         : "Select files to print";
+      updatePriceSummary();
+    }
+
+    function updatePriceSummary() {
+      const box = document.getElementById("priceSummary");
+      if (!selectedFiles.length) {
+        box.style.display = "none";
+        return;
+      }
+      let totalPages = 0;
+      let allKnown = true;
+      selectedFiles.forEach(f => {
+        const pg = filePagesMap.get(f);
+        if (typeof pg === "number") totalPages += pg;
+        else allKnown = false;
+      });
+      if (!allKnown) {
+        box.style.display = "none";
+        return;
+      }
+      const copies = Math.max(1, parseInt(document.getElementById("copies").value, 10) || 1);
+      const rate = colorMode === "bw" ? priceBw : priceColor;
+      const total = (totalPages * copies * rate).toFixed(0);
+      document.getElementById("priceBreakdown").textContent =
+        `${totalPages} pg × ${copies} ${copies > 1 ? "copies" : "copy"} × ₹${rate}/pg`;
+      document.getElementById("priceTotal").textContent = `₹${total}`;
+      box.style.display = "flex";
     }
 
     function showError(msg) {
@@ -507,8 +553,11 @@
         renderStatuses(data.jobs);
         startPolling();
 
-        document.getElementById("successDetail").textContent =
-          `${count} file${count > 1 ? "s" : ""} received and sent to the printer.`;
+        const tokens = data.jobs.map(j => `#${j.token}`).join(", ");
+        const totalAmt = data.jobs.reduce((acc, j) => acc + (j.total_price || 0), 0);
+        document.getElementById("successDetail").innerHTML =
+          `<div style="font-size:1.5rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens}</div>` +
+          `${count} file${count > 1 ? "s" : ""} sent to printer • Total: <strong>₹${totalAmt}</strong>`;
         successOverlay.classList.add("show");
       } catch (err) {
         showError(err.message);
@@ -527,12 +576,12 @@
         <div class="job-card">
           <div class="job-top">
             <span style="font-weight:600; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis;">
-              ${fileIcon(j.filename)} ${j.filename}
+              <strong style="color:#93c5fd;">#${j.token}</strong> • ${fileIcon(j.filename)} ${j.filename}
             </span>
             <span class="badge ${j.status}">${j.status.replace("_", " ")}</span>
           </div>
           <div style="font-size:0.78rem; color:#94a3b8; margin-top:5px;">
-            ${j.message} • ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies}
+            ${j.message} • ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies} • <strong style="color:#86efac;">₹${j.total_price}</strong>
           </div>
         </div>
       `).join("");

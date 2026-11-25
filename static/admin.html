@@ -144,6 +144,15 @@
             </div>
           </div>
 
+          <div class="field">
+            <label>Pricing (₹ per page)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px; align-items:center;">
+              <input type="text" id="priceBw" placeholder="B&W ₹" title="B&W ₹/page" />
+              <input type="text" id="priceColor" placeholder="Color ₹" title="Color ₹/page" />
+              <button class="btn btn-primary" onclick="savePrices()">Save</button>
+            </div>
+          </div>
+
           <div class="toggle-row">
             <div class="toggle-label">
               <strong>Auto-Accept &amp; Print</strong>
@@ -214,6 +223,8 @@
         document.getElementById("autoPrintToggle").checked = data.auto_print;
         document.getElementById("customUrl").value = data.custom_base_url || "";
         document.getElementById("shopName").value = data.shop_name || "";
+        document.getElementById("priceBw").value = data.price_bw ?? 2;
+        document.getElementById("priceColor").value = data.price_color ?? 10;
 
         const badge = document.getElementById("networkBadge");
         badge.className = "network-badge";
@@ -286,6 +297,18 @@
       });
     }
 
+    async function savePrices() {
+      const bw = parseFloat(document.getElementById("priceBw").value);
+      const col = parseFloat(document.getElementById("priceColor").value);
+      await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_bw: isNaN(bw) ? 2 : bw,
+          price_color: isNaN(col) ? 10 : col,
+        }),
+      });
+    }
+
     async function loadJobs() {
       try {
         const res = await fetch("/api/jobs");
@@ -312,6 +335,7 @@
         });
         document.getElementById("statsBar").innerHTML = `
           <span class="stat-pill">Total: ${stats.total}</span>
+          <span class="stat-pill active">💰 Revenue: ₹${(data.total_revenue || 0).toFixed(0)}</span>
           ${stats.printing ? `<span class="stat-pill active">⏳ Printing: ${stats.printing}</span>` : ""}
           ${stats.printed ? `<span class="stat-pill">✅ Printed: ${stats.printed}</span>` : ""}
           ${stats.waiting ? `<span class="stat-pill">🔵 Waiting: ${stats.waiting}</span>` : ""}
@@ -325,15 +349,15 @@
         tbody.innerHTML = data.jobs.map(j => `
           <tr>
             <td>
-              <div><strong>${j.customer_name}</strong></div>
+              <div><strong style="color:#93c5fd;">#${j.token || "-"}</strong> • <strong>${j.customer_name}</strong></div>
               <div style="font-size:0.76rem; color:var(--muted);">${j.created_at}</div>
             </td>
             <td>
               <div>${j.filename}</div>
-              <div style="font-size:0.76rem; color:var(--muted);">${j.total_file_pages} pg • ${(j.file_size/1024).toFixed(0)} KB</div>
+              <div style="font-size:0.76rem; color:var(--muted);">${j.selected_pages || j.total_file_pages} pg • ${(j.file_size/1024).toFixed(0)} KB</div>
             </td>
             <td style="font-size:0.82rem;">
-              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • ${j.paper_size || "A4"} • pg: ${j.page_range} • x${j.copies}
+              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies} • <strong style="color:#86efac;">₹${j.total_price ?? 0}</strong>
             </td>
             <td>
               <span class="badge ${j.status}">${j.status.replace("_"," ")}</span>

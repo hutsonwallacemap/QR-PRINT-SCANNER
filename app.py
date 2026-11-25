@@ -72,6 +72,8 @@ class SettingsUpdate(BaseModel):
     auto_print: Optional[bool] = None
     custom_base_url: Optional[str] = None
     shop_name: Optional[str] = None
+    price_bw: Optional[float] = None
+    price_color: Optional[float] = None
 
 
 # ── Pages ────────────────────────────────────────────────────────────
@@ -101,6 +103,8 @@ def server_info(request: Request):
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "price_bw": job_manager.price_bw,
+        "price_color": job_manager.price_color,
         "tunnel_status": tunnel_manager.status,
         "is_public": bool(job_manager.custom_base_url or os.environ.get("VERCEL")),
         "allowed_extensions": sorted(ALL_EXTENSIONS),
@@ -127,12 +131,18 @@ def update_settings(payload: SettingsUpdate):
         job_manager.custom_base_url = payload.custom_base_url.strip()
     if payload.shop_name is not None:
         job_manager.shop_name = payload.shop_name.strip()
+    if payload.price_bw is not None:
+        job_manager.price_bw = max(0.0, round(float(payload.price_bw), 2))
+    if payload.price_color is not None:
+        job_manager.price_color = max(0.0, round(float(payload.price_color), 2))
     return {
         "status": "ok",
         "active_printer": job_manager.active_printer,
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
         "shop_name": job_manager.shop_name,
+        "price_bw": job_manager.price_bw,
+        "price_color": job_manager.price_color,
         "qr_url": get_qr_target_url(),
     }
 
@@ -233,9 +243,12 @@ async def upload_and_print(
 
 @app.get("/api/jobs")
 def list_jobs():
+    jobs = job_manager.list_jobs()
+    revenue = round(sum(j.get("total_price", 0.0) for j in jobs if j.get("status") == "printed"), 2)
     return {
-        "jobs": job_manager.list_jobs(), "auto_print": job_manager.auto_print,
+        "jobs": jobs, "auto_print": job_manager.auto_print,
         "active_printer": job_manager.active_printer, "has_new_job": job_manager.has_new_job,
+        "total_revenue": revenue,
     }
 
 @app.get("/api/jobs/{job_id}")
