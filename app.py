@@ -50,9 +50,12 @@ UPLOAD_DIR = (
 )
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS | TEXT_EXTENSIONS
 
+MAX_FILE_SIZE_MB = 50
+MAX_FILES_PER_UPLOAD = 10
+
 SERVER_PORT = int(os.environ.get("QR_PRINT_PORT", "8500"))
 
-app = FastAPI(title="Universal QR Print System", version="1.0.0")
+app = FastAPI(title="Universal QR Print System", version="2.0.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 job_manager = PrintJobManager(upload_dir=UPLOAD_DIR)
@@ -85,6 +88,7 @@ class SettingsUpdate(BaseModel):
     active_printer: Optional[str] = None
     auto_print: Optional[bool] = None
     custom_base_url: Optional[str] = None
+    shop_name: Optional[str] = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -112,9 +116,12 @@ def server_info(request: Request) -> dict:
         "active_printer": job_manager.active_printer,
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
+        "shop_name": job_manager.shop_name,
         "tunnel_status": tunnel_manager.status,
         "is_public": bool(job_manager.custom_base_url or os.environ.get("VERCEL")),
         "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+        "max_file_size_mb": MAX_FILE_SIZE_MB,
+        "max_files": MAX_FILES_PER_UPLOAD,
     }
 
 
@@ -140,11 +147,15 @@ def update_settings(payload: SettingsUpdate) -> dict:
     if payload.custom_base_url is not None:
         job_manager.custom_base_url = payload.custom_base_url.strip()
 
+    if payload.shop_name is not None:
+        job_manager.shop_name = payload.shop_name.strip()
+
     return {
         "status": "ok",
         "active_printer": job_manager.active_printer,
         "auto_print": job_manager.auto_print,
         "custom_base_url": job_manager.custom_base_url,
+        "shop_name": job_manager.shop_name,
         "qr_url": get_qr_target_url(),
     }
 
@@ -180,6 +191,12 @@ async def upload_and_print(
     if not files:
         raise HTTPException(status_code=400, detail="Please select at least one file.")
 
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {MAX_FILES_PER_UPLOAD} files per upload. You sent {len(files)}.",
+        )
+
     created_jobs = []
     errors = []
 
@@ -198,6 +215,11 @@ async def upload_and_print(
             errors.append(f"{orig_name}: File is empty.")
             continue
 
+        file_size_mb = len(content) / (1024 * 1024)
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            errors.append(f"{orig_name}: File too large ({file_size_mb:.1f}MB). Maximum is {MAX_FILE_SIZE_MB}MB.")
+            continue
+
         dest_path.write_bytes(content)
 
         try:
@@ -211,7 +233,6 @@ async def upload_and_print(
                 printer_name=printer_name or None,
                 customer_name=customer_name,
             )
-            # Validate page range upfront so user gets immediate feedback if invalid
             parse_page_range(job.page_range, job.total_file_pages)
             created_jobs.append(job.to_dict())
         except Exception as exc:
@@ -237,6 +258,7 @@ def list_jobs() -> dict:
         "jobs": job_manager.list_jobs(),
         "auto_print": job_manager.auto_print,
         "active_printer": job_manager.active_printer,
+        "has_new_job": job_manager.has_new_job,
     }
 
 

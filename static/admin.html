@@ -3,192 +3,182 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Print System — Admin Dashboard</title>
+  <title>QR Print — Shop Dashboard</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --primary: #3b82f6;
-      --success: #22c55e;
-      --warn: #f59e0b;
-      --danger: #ef4444;
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+      --text: #f8fafc; --muted: #94a3b8; --primary: #3b82f6;
+      --success: #22c55e; --warn: #f59e0b; --danger: #ef4444;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 24px;
+      background: var(--bg); color: var(--text); padding: 20px;
     }
-    .wrap { max-width: 1120px; margin: 0 auto; }
+    .wrap { max-width: 1140px; margin: 0 auto; }
     .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
     }
-    .topbar h1 { margin: 0; font-size: 1.6rem; }
-    .grid {
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 20px;
-    }
+    .topbar h1 { font-size: 1.5rem; }
+    .topbar-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
     @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-    }
-    .qr-box { text-align: center; }
-    .qr-box img {
-      width: 220px;
-      height: 220px;
-      border-radius: 12px;
-      background: #fff;
-      padding: 8px;
-    }
-    .url-box {
-      margin-top: 10px;
-      padding: 8px 10px;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-family: monospace;
-      font-size: 0.85rem;
-      word-break: break-all;
-    }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
     .btn {
-      display: inline-block;
-      padding: 9px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #0f172a;
-      color: var(--text);
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      font-size: 0.88rem;
+      display: inline-block; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: #0f172a; color: var(--text); font-weight: 600; cursor: pointer;
+      text-decoration: none; font-size: 0.88rem;
     }
     .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+    .btn-success { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #86efac; }
+    .btn-danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+
+    /* QR Section */
+    .qr-box { text-align: center; }
+    .qr-box img { width: 240px; height: 240px; border-radius: 14px; background: #fff; padding: 10px; }
+    .network-badge {
+      margin-top: 10px; padding: 6px 14px; border-radius: 999px; display: inline-block;
+      font-size: 0.82rem; font-weight: 700;
+    }
+    .network-badge.public { background: rgba(34,197,94,0.15); color: #86efac; }
+    .network-badge.starting { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .network-badge.local { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .url-box {
+      margin-top: 10px; padding: 8px 12px; background: #0f172a; border: 1px solid var(--border);
+      border-radius: 8px; font-family: monospace; font-size: 0.85rem; word-break: break-all;
+    }
+    .qr-hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; line-height: 1.4; }
+
+    /* Settings */
     .field { margin-top: 14px; }
-    .field label { display: block; font-size: 0.84rem; color: var(--muted); margin-bottom: 6px; }
+    .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
     select, input[type="text"] {
-      width: 100%;
-      padding: 9px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #0f172a;
-      color: var(--text);
+      width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: #0f172a; color: var(--text); font-size: 0.9rem;
     }
     .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 14px;
-      padding: 10px 12px;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 14px; padding: 12px; background: #0f172a; border: 1px solid var(--border); border-radius: 10px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
+    .toggle-label strong { font-size: 0.92rem; }
+    .toggle-label small { display: block; font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0; background: #475569;
+      border-radius: 26px; transition: 0.3s;
     }
-    th, td {
-      text-align: left;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--border);
+    .slider::before {
+      content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%; transition: 0.3s;
     }
-    th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    .switch input:checked + .slider { background: var(--success); }
+    .switch input:checked + .slider::before { transform: translateX(22px); }
+
+    /* Job table */
+    .job-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .job-table th, .job-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+    .job-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
     .badge {
-      display: inline-block;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
     }
-    .badge.queued, .badge.printing { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
-    .badge.printed { background: rgba(34, 197, 94, 0.2); color: #86efac; }
-    .badge.failed { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
-    .badge.waiting_approval { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .badge.queued, .badge.printing { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .badge.printed { background: rgba(34,197,94,0.2); color: #86efac; }
+    .badge.failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .badge.waiting_approval { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .job-msg { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
+    .empty-state { text-align: center; padding: 32px; color: var(--muted); }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+    /* Stats bar */
+    .stats-bar { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .stat-pill {
+      padding: 6px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+      background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); color: #93c5fd;
+    }
+    .stat-pill.active { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #86efac; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
-      <h1>🖨️ Universal QR Print — Shop Dashboard</h1>
-      <div style="display:flex; gap:8px;">
-        <a href="/" target="_blank" class="btn">Open Customer Upload Page</a>
-        <a href="/qr-poster" target="_blank" class="btn btn-primary">Print QR Poster</a>
+      <h1>🖨️ QR Print — Shop Dashboard</h1>
+      <div class="topbar-btns">
+        <a href="/" target="_blank" class="btn">📱 Customer Page</a>
+        <a href="/qr-poster" target="_blank" class="btn btn-primary">🖨️ Print QR Poster</a>
       </div>
     </div>
 
     <div class="grid">
-      <div class="card">
-        <div class="qr-box">
-          <img id="qrImg" src="/api/qr" alt="QR Code" />
-          <div id="networkBadge" style="margin-top:10px; font-size:0.82rem; font-weight:700; color:#93c5fd;">
-            Checking network mode...
-          </div>
-          <div class="url-box" id="qrUrl">Loading...</div>
-          <p style="color:var(--muted); font-size:0.82rem; margin:8px 0 0;">
-            Customers scan this QR code on 4G/5G mobile data or Wi-Fi to upload &amp; print.
-          </p>
-        </div>
-
-        <div class="field">
-          <label for="printerSelect">Active Windows Printer</label>
-          <div style="display:flex; gap:6px;">
-            <select id="printerSelect"></select>
-            <button class="btn" onclick="loadPrinters()">↻</button>
+      <!-- Left Panel -->
+      <div>
+        <div class="card">
+          <div class="qr-box">
+            <img id="qrImg" src="/api/qr" alt="QR Code" />
+            <div>
+              <span class="network-badge local" id="networkBadge">Checking...</span>
+            </div>
+            <div class="url-box" id="qrUrl">Loading...</div>
+            <div class="qr-hint">Customers scan this QR code from phone camera.<br/>Works on 4G/5G mobile data or any Wi-Fi.</div>
           </div>
         </div>
 
-        <div class="toggle-row">
-          <div>
-            <strong>Auto-Accept &amp; Print</strong>
-            <div style="font-size:0.78rem; color:var(--muted);">Print uploads immediately</div>
+        <div class="card" style="margin-top:16px;">
+          <div class="field" style="margin-top:0;">
+            <label>Shop Name (shown to customers)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="shopName" placeholder="e.g. Sharma Print & Xerox" />
+              <button class="btn btn-primary" onclick="saveShopName()">Save</button>
+            </div>
           </div>
-          <input type="checkbox" id="autoPrintToggle" style="width:20px; height:20px;" />
-        </div>
 
-        <div class="field">
-          <label for="customUrl">Optional Public URL (ngrok / Cloudflare Tunnel)</label>
-          <div style="display:flex; gap:6px;">
-            <input type="text" id="customUrl" placeholder="https://your-shop.trycloudflare.com" />
-            <button class="btn btn-primary" onclick="saveCustomUrl()">Save</button>
+          <div class="field">
+            <label>Active Windows Printer</label>
+            <div style="display:flex; gap:6px;">
+              <select id="printerSelect"></select>
+              <button class="btn" onclick="loadPrinters()">↻</button>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <strong>Auto-Accept &amp; Print</strong>
+              <small>Print uploads immediately without approval</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="autoPrintToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label>Custom Public URL (optional — auto-detected if tunnel is running)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="customUrl" placeholder="https://your-shop.trycloudflare.com" />
+              <button class="btn btn-primary" onclick="saveCustomUrl()">Save</button>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- Right Panel - Queue -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h2 style="margin:0; font-size:1.15rem;">Live Print Queue</h2>
-          <span style="color:var(--muted); font-size:0.82rem;">Auto-refreshing every 2s</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="font-size:1.15rem;">Live Print Queue</h2>
+          <span style="color:var(--muted); font-size:0.78rem;">Auto-refreshing</span>
         </div>
+        <div class="stats-bar" id="statsBar"></div>
         <div style="overflow-x:auto;">
-          <table>
+          <table class="job-table">
             <thead>
-              <tr>
-                <th>Time / Customer</th>
-                <th>File</th>
-                <th>Options</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
+              <tr><th>Customer</th><th>File</th><th>Options</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody id="jobsBody">
-              <tr><td colspan="5" style="color:var(--muted); text-align:center; padding:24px;">No print jobs yet.</td></tr>
+              <tr><td colspan="5" class="empty-state"><div class="icon">📭</div>No print jobs yet.<br/>Waiting for customers to scan the QR code...</td></tr>
             </tbody>
           </table>
         </div>
@@ -196,56 +186,83 @@
     </div>
   </div>
 
+  <!-- Notification sound (short beep via Web Audio API) -->
   <script>
+    let audioCtx;
+    function playNotificationBeep() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch {}
+    }
+
     let lastQrUrl = "";
+    let infoTimer;
+
     async function loadInfo() {
-      const res = await fetch("/api/info");
-      const data = await res.json();
-      document.getElementById("qrUrl").textContent = data.qr_url;
-      document.getElementById("autoPrintToggle").checked = data.auto_print;
-      document.getElementById("customUrl").value = data.custom_base_url || "";
+      try {
+        const res = await fetch("/api/info");
+        const data = await res.json();
+        document.getElementById("qrUrl").textContent = data.qr_url;
+        document.getElementById("autoPrintToggle").checked = data.auto_print;
+        document.getElementById("customUrl").value = data.custom_base_url || "";
+        document.getElementById("shopName").value = data.shop_name || "";
 
-      const badge = document.getElementById("networkBadge");
-      if (data.is_public) {
-        badge.textContent = "🌐 Public 4G/5G + Wi-Fi Mode Active";
-        badge.style.color = "#86efac";
-      } else if (data.tunnel_status === "starting") {
-        badge.textContent = "⏳ Starting Public 4G/5G Tunnel...";
-        badge.style.color = "#fcd34d";
-        setTimeout(loadInfo, 2000);
-      } else {
-        badge.textContent = "📶 Local Wi-Fi Mode Only";
-        badge.style.color = "#93c5fd";
-      }
+        const badge = document.getElementById("networkBadge");
+        badge.className = "network-badge";
+        if (data.is_public) {
+          badge.textContent = "🌐 Public Mode — 4G/5G + Wi-Fi";
+          badge.classList.add("public");
+        } else if (data.tunnel_status === "starting") {
+          badge.textContent = "⏳ Starting Public Tunnel...";
+          badge.classList.add("starting");
+        } else {
+          badge.textContent = "📶 Local Wi-Fi Only";
+          badge.classList.add("local");
+        }
 
-      if (lastQrUrl && lastQrUrl !== data.qr_url) {
-        document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
-      }
-      lastQrUrl = data.qr_url;
+        if (lastQrUrl && lastQrUrl !== data.qr_url) {
+          document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
+        }
+        lastQrUrl = data.qr_url;
+
+        // Keep polling info until tunnel connects
+        if (data.tunnel_status === "starting") {
+          if (!infoTimer) infoTimer = setInterval(loadInfo, 2000);
+        } else if (infoTimer) {
+          clearInterval(infoTimer);
+          infoTimer = null;
+        }
+      } catch {}
     }
 
     async function loadPrinters() {
       const res = await fetch("/api/printers");
       const data = await res.json();
       const sel = document.getElementById("printerSelect");
-      sel.innerHTML = data.printers.map((p) => {
+      sel.innerHTML = data.printers.map(p => {
         const selected = p.name === data.active_printer ? "selected" : "";
-        return `<option value="${p.name}" ${selected}>${p.name}${p.is_default ? " (Windows Default)" : ""}</option>`;
+        return `<option value="${p.name}" ${selected}>${p.name}${p.is_default ? " ★" : ""}</option>`;
       }).join("");
     }
 
-    document.getElementById("printerSelect").addEventListener("change", async (e) => {
+    document.getElementById("printerSelect").addEventListener("change", async e => {
       await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active_printer: e.target.value }),
       });
     });
 
-    document.getElementById("autoPrintToggle").addEventListener("change", async (e) => {
+    document.getElementById("autoPrintToggle").addEventListener("change", async e => {
       await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auto_print: e.target.checked }),
       });
     });
@@ -253,8 +270,7 @@
     async function saveCustomUrl() {
       const url = document.getElementById("customUrl").value;
       const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ custom_base_url: url }),
       });
       const data = await res.json();
@@ -262,39 +278,76 @@
       document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
     }
 
+    async function saveShopName() {
+      const name = document.getElementById("shopName").value;
+      await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop_name: name }),
+      });
+    }
+
     async function loadJobs() {
-      const res = await fetch("/api/jobs");
-      const data = await res.json();
-      const tbody = document.getElementById("jobsBody");
-      if (!data.jobs.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted); text-align:center; padding:24px;">No print jobs yet.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = data.jobs.map((j) => `
-        <tr>
-          <td>
-            <div><strong>${j.customer_name}</strong></div>
-            <div style="font-size:0.78rem; color:var(--muted);">${j.created_at}</div>
-          </td>
-          <td>
-            <div>${j.filename}</div>
-            <div style="font-size:0.78rem; color:var(--muted);">${j.total_file_pages} page(s) • ${j.printer_name}</div>
-          </td>
-          <td style="font-size:0.82rem;">
-            ${j.color_mode === "bw" ? "B&W" : "Color"} • Pages: ${j.page_range} • x${j.copies}
-          </td>
-          <td>
-            <span class="badge ${j.status}">${j.status.replace("_", " ")}</span>
-            <div style="font-size:0.76rem; color:var(--muted); margin-top:4px;">${j.message}</div>
-          </td>
-          <td>
-            <div style="display:flex; gap:6px;">
-              <button class="btn" onclick="reprintJob('${j.id}')">${j.status === "waiting_approval" ? "Print" : "Reprint"}</button>
-              <button class="btn btn-danger" onclick="deleteJob('${j.id}')">✕</button>
-            </div>
-          </td>
-        </tr>
-      `).join("");
+      try {
+        const res = await fetch("/api/jobs");
+        const data = await res.json();
+        const tbody = document.getElementById("jobsBody");
+
+        // Notification beep on new job
+        if (data.has_new_job && data.jobs.length) {
+          playNotificationBeep();
+          if (Notification.permission === "granted") {
+            new Notification("🖨️ New Print Job!", {
+              body: `${data.jobs[0].customer_name} — ${data.jobs[0].filename}`,
+            });
+          }
+        }
+
+        // Stats
+        const stats = { total: data.jobs.length, printed: 0, printing: 0, failed: 0, waiting: 0 };
+        data.jobs.forEach(j => {
+          if (j.status === "printed") stats.printed++;
+          else if (j.status === "printing" || j.status === "queued") stats.printing++;
+          else if (j.status === "failed") stats.failed++;
+          else if (j.status === "waiting_approval") stats.waiting++;
+        });
+        document.getElementById("statsBar").innerHTML = `
+          <span class="stat-pill">Total: ${stats.total}</span>
+          ${stats.printing ? `<span class="stat-pill active">⏳ Printing: ${stats.printing}</span>` : ""}
+          ${stats.printed ? `<span class="stat-pill">✅ Printed: ${stats.printed}</span>` : ""}
+          ${stats.waiting ? `<span class="stat-pill">🔵 Waiting: ${stats.waiting}</span>` : ""}
+          ${stats.failed ? `<span class="stat-pill" style="color:#fca5a5;">❌ Failed: ${stats.failed}</span>` : ""}
+        `;
+
+        if (!data.jobs.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icon">📭</div>No print jobs yet.<br/>Waiting for customers to scan the QR code...</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.jobs.map(j => `
+          <tr>
+            <td>
+              <div><strong>${j.customer_name}</strong></div>
+              <div style="font-size:0.76rem; color:var(--muted);">${j.created_at}</div>
+            </td>
+            <td>
+              <div>${j.filename}</div>
+              <div style="font-size:0.76rem; color:var(--muted);">${j.total_file_pages} pg • ${(j.file_size/1024).toFixed(0)} KB</div>
+            </td>
+            <td style="font-size:0.82rem;">
+              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.page_range} • x${j.copies}
+            </td>
+            <td>
+              <span class="badge ${j.status}">${j.status.replace("_"," ")}</span>
+              <div class="job-msg">${j.message}</div>
+            </td>
+            <td>
+              <div style="display:flex; gap:5px;">
+                <button class="btn btn-success" onclick="reprintJob('${j.id}')">${j.status === "waiting_approval" ? "✓ Print" : "↻"}</button>
+                <button class="btn btn-danger" onclick="deleteJob('${j.id}')">✕</button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+      } catch {}
     }
 
     async function reprintJob(id) {
@@ -305,6 +358,11 @@
     async function deleteJob(id) {
       await fetch(`/api/jobs/${id}`, { method: "DELETE" });
       loadJobs();
+    }
+
+    // Request notification permission
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
     }
 
     loadInfo();
