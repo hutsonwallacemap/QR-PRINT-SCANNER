@@ -317,6 +317,7 @@
     const pageRangeInput = document.getElementById("pageRange");
 
     let selectedFiles = [];
+    let filePagesMap = new WeakMap();
     let colorMode = "color";
     let sidesMode = "one";
     let activeJobIds = [];
@@ -379,11 +380,35 @@
     dropzone.addEventListener("drop", e => { e.preventDefault(); dropzone.classList.remove("dragover"); addFiles(e.dataTransfer.files); });
     fileInput.addEventListener("change", () => { addFiles(fileInput.files); fileInput.value = ""; });
 
-    function addFiles(files) {
+    async function addFiles(files) {
       for (const f of files) {
         if (selectedFiles.length >= 10) { showError("Maximum 10 files per upload."); break; }
         if (f.size > 50 * 1024 * 1024) { showError(`${f.name} is over 50MB.`); continue; }
         selectedFiles.push(f);
+        const ext = f.name.split(".").pop().toLowerCase();
+        if (["jpg","jpeg","png","bmp","webp"].includes(ext)) {
+          filePagesMap.set(f, 1);
+        } else {
+          filePagesMap.set(f, "...");
+          inspectFilePages(f);
+        }
+      }
+      renderFiles();
+    }
+
+    async function inspectFilePages(file) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/inspect", { method: "POST", body: fd });
+        if (res.ok) {
+          const data = await res.json();
+          filePagesMap.set(file, data.pages);
+        } else {
+          filePagesMap.set(file, "?");
+        }
+      } catch {
+        filePagesMap.set(file, "?");
       }
       renderFiles();
     }
@@ -404,7 +429,15 @@
 
     function renderFiles() {
       fileListEl.innerHTML = "";
+      let totalPages = 0;
+      let allKnown = selectedFiles.length > 0;
+
       selectedFiles.forEach((f, idx) => {
+        const pg = filePagesMap.get(f);
+        if (typeof pg === "number") totalPages += pg;
+        else allKnown = false;
+
+        const pgLabel = pg === "..." ? "counting..." : (pg === "?" ? "" : `${pg} ${pg === 1 ? "page" : "pages"}`);
         const row = document.createElement("div");
         row.className = "file-item";
         row.innerHTML = `
@@ -412,7 +445,8 @@
             <span>${fileIcon(f.name)}</span>
             <span class="fi-name">${f.name}</span>
           </div>
-          <div style="display:flex; align-items:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${pgLabel ? `<span style="background:rgba(59,130,246,0.18); color:#93c5fd; padding:2px 8px; border-radius:999px; font-size:0.74rem; font-weight:700;">${pgLabel}</span>` : ""}
             <span class="fi-size">${formatSize(f.size)}</span>
           </div>
         `;
@@ -427,11 +461,11 @@
       dropzone.classList.toggle("has-files", hasFiles);
       document.getElementById("dropIcon").textContent = hasFiles ? "✅" : "📄📸";
       document.getElementById("dropText").textContent = hasFiles
-        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} ready — tap to add more`
+        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} ready${allKnown ? ` • ${totalPages} total ${totalPages === 1 ? "page" : "pages"}` : ""}`
         : "Tap to select Photos, PDF, or Word";
       submitBtn.disabled = !hasFiles;
       submitBtn.textContent = hasFiles
-        ? `🖨️ Print ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""} Now`
+        ? `🖨️ Print ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}${allKnown ? ` (${totalPages} pg)` : ""} Now`
         : "Select files to print";
     }
 

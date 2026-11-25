@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from job_manager import PrintJobManager
-from printer_engine import ALL_EXTENSIONS, list_printers, parse_page_range
+from printer_engine import ALL_EXTENSIONS, count_file_pages, list_printers, parse_page_range
 from tunnel import PublicTunnelManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -148,6 +148,30 @@ def generate_qr(request: Request, url: Optional[str] = None):
     img.save(buf, format="PNG")
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
+
+
+@app.post("/api/inspect")
+async def inspect_file(file: UploadFile = File(...)):
+    """Count pages of a selected file before printing so the customer sees page count."""
+    orig_name = Path(file.filename or "document").name
+    ext = Path(orig_name).suffix.lower()
+    if ext not in ALL_EXTENSIONS:
+        raise HTTPException(400, f"Unsupported file type '{ext}'.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "File is empty.")
+    if len(content) / (1024 * 1024) > MAX_FILE_SIZE_MB:
+        raise HTTPException(400, f"File too large (max {MAX_FILE_SIZE_MB}MB).")
+
+    tmp_path = UPLOAD_DIR / f"inspect_{uuid.uuid4().hex[:8]}_{orig_name}"
+    tmp_path.write_bytes(content)
+    try:
+        pages = count_file_pages(tmp_path)
+        return {"filename": orig_name, "pages": pages}
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 @app.post("/api/upload")
