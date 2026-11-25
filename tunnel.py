@@ -63,7 +63,7 @@ class PublicTunnelManager:
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
             self._proc = subprocess.Popen(
-                [exe, "tunnel", "--no-autoupdate", "--url", f"http://127.0.0.1:{port}"],
+                [exe, "tunnel", "--no-autoupdate", "--protocol", "http2", "--url", f"http://127.0.0.1:{port}"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
