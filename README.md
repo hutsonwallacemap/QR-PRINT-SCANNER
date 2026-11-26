@@ -43,15 +43,29 @@ shop, so software can't know whether the customer really paid. The old version p
 customer pressed "I have paid", which let anyone print for free. Razorpay (or the shopkeeper's tap)
 is the only reliable confirmation.
 
-### Customers on mobile data (4G/5G)
-* By default the QR only works on the **shop Wi-Fi**. In your router, give the PC a fixed IP so the QR
-  never changes.
-* If **cloudflared** is installed (Install.bat does this), the app also creates an internet link. The free
-  link **changes on every restart**, so for a poster that never changes, use one of these:
-  * **Your own domain** with a named Cloudflare Tunnel. Enter it under *Or your own fixed address*.
-  * **Registry server.** Any always-on server running `python run.py --registry --no-tunnel`. Shops
-    enter its address and a Shop ID, and the poster points to `<registry>/s/<shop-id>`. Each shop ID
-    is locked to that shop's secret, so nobody else can redirect your customers.
+### Customers on mobile data (4G/5G) - on by default
+Customers can scan with **their own mobile internet**. No shop Wi-Fi is needed.
+
+How it works:
+1. `cloudflared` (installed by Install.bat) gives the shop PC a free internet address
+   (`https://random-words.trycloudflare.com`). This address changes every time the PC restarts.
+2. The poster QR points to a **permanent link**, `https://qr-print-scanner-alpha.vercel.app/s/<shop-id>`.
+3. Every minute the shop PC tells that link its current address. Customers are forwarded there
+   automatically, so **print the poster once and it keeps working**.
+
+The dashboard shows **Mobile data (4G/5G): Working** in *QR code & poster*, and an alert bar if it isn't.
+
+Good to know:
+- Each shop ID is locked to its own shop's secret, so nobody can redirect your customers.
+- If the PC is off, customers see a polite "shop is offline" page after about 3 minutes.
+- The free Cloudflare quick tunnel has no uptime guarantee. If it fails, the app retries with
+  growing pauses (15 s up to 5 min). For a business-grade link, use a **named Cloudflare tunnel on
+  your own domain** and enter it under *Or your own fixed address*.
+
+**Registry hosting (for the system owner, once):** the root `app.py` is the registry. Vercel serves it
+automatically from this repo. In Vercel → Storage, add a free **Upstash Redis** database so links are
+kept reliably across Vercel instances. Shops can use a different registry with the `QRPRINT_REGISTRY_URL`
+environment variable or the *registry server* field in the dashboard.
 
 ### Files customers can print
 PDF, JPG/PNG/WebP/GIF/BMP/TIFF photos, TXT, and Word (.doc/.docx/.rtf/.odt). Word needs Microsoft Word

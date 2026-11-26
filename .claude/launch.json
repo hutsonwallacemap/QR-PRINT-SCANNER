@@ -1,11 +1,8 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "qrprint-dev",
-      "runtimeExecutable": ".venv/Scripts/python.exe",
-      "runtimeArgs": ["dev.py"],
-      "port": 8600
-    }
+    { "name": "qrprint-dev", "runtimeExecutable": ".venv/Scripts/python.exe", "runtimeArgs": ["dev.py"], "port": 8600 },
+    { "name": "qrprint-dev-tunnel", "runtimeExecutable": ".venv/Scripts/python.exe", "runtimeArgs": ["dev.py", "--tunnel"], "port": 8600 },
+    { "name": "registry-local", "runtimeExecutable": ".venv/Scripts/python.exe", "runtimeArgs": ["-m", "uvicorn", "app:app", "--port", "8701"], "port": 8701 }
   ]
 }

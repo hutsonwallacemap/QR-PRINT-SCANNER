@@ -74,10 +74,15 @@ def main() -> None:
             threading.Thread(target=sync_registry, args=(ctx,), daemon=True).start()
 
         def heartbeat() -> None:
+            tick = 0
             while True:
-                time.sleep(60)
-                sync_registry(ctx)
+                time.sleep(15)
+                tick += 1
+                tunnel.start(PORT, on_url)  # restarts cloudflared within 15 s if it died
+                if tick % 4 == 0:           # refresh the permanent QR every minute
+                    sync_registry(ctx)
 
+        ctx.tunnel_allowed = True
         tunnel.start(PORT, on_url)
         threading.Thread(target=heartbeat, daemon=True).start()
 

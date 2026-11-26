@@ -112,6 +112,7 @@ async function loadState() {
   else if (!pr.ok) alerts.push(["bad", `Printer problem: ${pr.status}. Orders will wait/fail until fixed.`]);
   else if (pr.virtual) alerts.push(["", `"${pr.name}" is not a real printer. Choose your actual printer in 'Printer & prices'.`]);
   if (!s.razorpay_key_id && !s.upi_id && s.counter_payment === "off") alerts.push(["bad", "No payment method set up."]);
+  if (!state.mobile.ok && s.enable_tunnel) alerts.push(["", "Mobile data (4G/5G): " + state.mobile.text]);
   if (!s.accepting_orders) alerts.push(["", "You are NOT taking orders. Customers see a 'closed' message."]);
   const ab = $("alertBar");
   ab.hidden = !alerts.length;
@@ -146,8 +147,9 @@ async function loadState() {
   $("lanUrl").textContent = state.local_url;
   $("tunnelUrl").textContent = state.tunnel.url || ({ cloudflared_not_installed: "cloudflared not installed", inactive: "off", starting: "starting…" }[state.tunnel.status] || state.tunnel.status);
   $("regStatus").textContent = state.registry_status || (s.registry_url ? "waiting" : "not used");
-  $("qrNote").textContent = state.customer_url.startsWith("http://") && !s.public_url
-    ? "This QR works only on your shop Wi-Fi." : "This QR works on Wi-Fi and mobile data.";
+  $("qrNote").textContent = state.customer_url.startsWith("http://")
+    ? "This QR works only on your shop Wi-Fi." : "This QR never changes - print the poster once.";
+  $("mobileStatus").innerHTML = `<span class="dot ${state.mobile.ok ? "" : "warn"}"></span>${esc(state.mobile.text)}`;
   $("verInfo").textContent = "v" + state.version;
 }
 

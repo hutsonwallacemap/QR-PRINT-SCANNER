@@ -11,7 +11,9 @@ here = Path(__file__).resolve().parent
 os.environ.setdefault("QRPRINT_DATA_DIR", str(here / ".devdata"))
 os.environ.setdefault("QRPRINT_PORT", "8600")
 os.environ.setdefault("QRPRINT_VIRTUAL_DIR", str(here / ".devdata" / "printed"))
-sys.argv += ["--no-browser", "--no-tunnel"]
+sys.argv += ["--no-browser"]
+if "--tunnel" not in sys.argv:  # dev.py --tunnel  = also test the 4G/5G internet link
+    sys.argv.append("--no-tunnel")
 
 import run  # noqa: E402
 

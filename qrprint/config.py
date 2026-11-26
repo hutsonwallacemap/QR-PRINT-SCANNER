@@ -45,6 +45,7 @@ for _d in (DATA_DIR, FILES_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 PORT = int(os.environ.get("QRPRINT_PORT", "8500"))
+DEFAULT_REGISTRY_URL = os.environ.get("QRPRINT_REGISTRY_URL", "https://qr-print-scanner-alpha.vercel.app")
 
 # ── Limits ────────────────────────────────────────────────────────────
 
@@ -91,7 +92,8 @@ class Settings:
     public_url: str = ""               # fixed URL (own domain / named tunnel). Empty = auto
     enable_tunnel: bool = True
     shop_id: str = ""
-    registry_url: str = ""
+    # Permanent QR service (forwards <registry>/s/<shop_id> to this PC's current tunnel).
+    registry_url: str = DEFAULT_REGISTRY_URL
     registry_secret: str = ""
 
     # Security

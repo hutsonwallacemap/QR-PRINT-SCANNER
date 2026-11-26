@@ -335,3 +335,38 @@ def test_registry_cannot_be_hijacked(env):
     assert r.status_code == 307 and r.headers["location"] == "https://a.trycloudflare.com"
     assert c.post("/api/registry/heartbeat", json={"shop_id": "abc", "target_url": "javascript:alert(1)",
                                                    "secret": "s" * 32}).status_code == 400
+
+
+def test_vercel_registry_app():
+    import app as registry_app  # root app.py deployed to Vercel
+    registry_app.store = RegistryStore(None)
+    c = TestClient(registry_app.app)
+    assert c.get("/healthz").json()["role"] == "registry"
+    assert c.get("/s/nobody-here").status_code == 503
+    hb = {"shop_id": "ravi-print", "target_url": "https://x1.trycloudflare.com", "secret": "k" * 48}
+    assert c.post("/api/registry/heartbeat", json=hb).status_code == 200
+    r = c.get("/s/ravi-print", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "https://x1.trycloudflare.com"
+    # PC restarted -> new tunnel address, same secret: allowed
+    assert c.post("/api/registry/heartbeat", json={**hb, "target_url": "https://x2.trycloudflare.com"}).status_code == 200
+    assert c.get("/s/ravi-print", follow_redirects=False).headers["location"] == "https://x2.trycloudflare.com"
+    # someone else: refused
+    assert c.post("/api/registry/heartbeat", json={**hb, "secret": "z" * 48}).status_code == 403
+    # stale shop (PC off for >10 min) shows the offline page instead of a dead link
+    registry_app.store._mem["ravi-print"]["updated_at"] -= 3600
+    assert c.get("/s/ravi-print", follow_redirects=False).status_code == 503
+
+
+def test_qr_uses_permanent_registry_only_when_tunnel_runs(env):
+    ctx, s = env["ctx"], env["settings"]
+    s.update(registry_url="https://reg.example", shop_id="sai-xerox", enable_tunnel=True)
+    assert ctx.customer_url().startswith("http://")  # --no-tunnel: Wi-Fi address
+    ctx.tunnel_allowed = True
+    assert ctx.customer_url() == "https://reg.example/s/sai-xerox"
+
+
+def test_tunnel_url_pattern_ignores_cloudflare_errors():
+    from qrprint.tunnel import TUNNEL_URL_RE
+    assert not TUNNEL_URL_RE.search('failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel"')
+    m = TUNNEL_URL_RE.search("|  https://saying-webmasters-defining-automobiles.trycloudflare.com  |")
+    assert m and m.group(0) == "https://saying-webmasters-defining-automobiles.trycloudflare.com"

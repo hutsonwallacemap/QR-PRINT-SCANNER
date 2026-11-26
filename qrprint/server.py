@@ -69,13 +69,36 @@ class Ctx:
         self.upload_limiter = RateLimiter(80, 600)
         self.order_limiter = RateLimiter(20, 600)
         self.registry_status = ""
+        self.tunnel_allowed = False  # set by run.py when the internet tunnel is started
         self.started = time.time()
+
+    def mobile_status(self) -> Dict[str, Any]:
+        """Can a customer on 4G/5G reach this shop right now?"""
+        s = self.settings.data
+        if s.public_url:
+            return {"ok": True, "text": f"Working - fixed address {s.public_url}"}
+        if not (s.enable_tunnel and self.tunnel_allowed):
+            return {"ok": False, "text": "Off - only phones on the shop Wi-Fi can print"}
+        t = self.tunnel.status
+        if t == "cloudflared_not_installed":
+            return {"ok": False, "text": "Not working - cloudflared is not installed (run Install.bat)"}
+        if t != "connected":
+            return {"ok": False, "text": "Connecting to the internet..." if t in ("starting", "inactive") else f"Not working - {t}"}
+        if s.registry_url and s.shop_id:
+            if self.registry_status == "ok":
+                return {"ok": True, "text": "Working - customers can use Wi-Fi or mobile data"}
+            if self.registry_status:
+                return {"ok": False, "text": f"Permanent QR not updated: {self.registry_status}"}
+            return {"ok": False, "text": "Registering the permanent QR..."}
+        return {"ok": True, "text": "Working, but the QR changes after every restart (no registry set)"}
 
     def customer_url(self) -> str:
         s = self.settings.data
         if s.public_url:
             return s.public_url.rstrip("/")
-        if s.registry_url and s.shop_id and self.registry_status == "ok":
+        # The registry address never changes, so the printed poster keeps working
+        # even though the free tunnel gets a new address after every restart.
+        if s.registry_url and s.shop_id and s.enable_tunnel and self.tunnel_allowed:
             return f"{s.registry_url.rstrip('/')}/s/{s.shop_id}"
         if self.tunnel.public_url:
             return self.tunnel.public_url
@@ -369,6 +392,7 @@ def create_app(ctx: Ctx) -> FastAPI:
             "local_url": f"http://{local_ip()}:{PORT}",
             "tunnel": {"status": ctx.tunnel.status, "url": ctx.tunnel.public_url},
             "registry_status": ctx.registry_status,
+            "mobile": ctx.mobile_status(),
             "word_supported": documents.office_converter_available(),
             "worker": orders.worker_state,
             "paper_sizes": PAPER_SIZES,
@@ -609,7 +633,7 @@ def create_app(ctx: Ctx) -> FastAPI:
         @app.get("/s/{shop_id}")
         def registry_redirect(shop_id: str):
             rec = reg.get(shop_id)
-            if rec and rec.get("target_url") and time.time() - rec.get("updated_at", 0) < 600:
+            if rec and rec.get("target_url") and time.time() - rec.get("updated_at", 0) < 180:
                 return RedirectResponse(rec["target_url"], status_code=307, headers=NO_STORE)
             return HTMLResponse(OFFLINE_HTML, status_code=503, headers=NO_STORE)
 
@@ -625,10 +649,52 @@ OFFLINE_HTML = """<!doctype html><html><head><meta name="viewport" content="widt
 This page retries by itself.</p></div></body></html>"""
 
 
+def dns_ready(url: str, timeout: float = 90) -> bool:
+    """Wait until public DNS (Cloudflare + Google) knows the new tunnel name.
+
+    If customers were sent there before the name exists, their mobile
+    network's DNS could cache "not found" for minutes.
+    """
+    import json
+    import urllib.request
+    from urllib.parse import urlparse
+
+    host = urlparse(url).hostname or ""
+    resolvers = ["https://cloudflare-dns.com/dns-query?name={}&type=A", "https://dns.google/resolve?name={}&type=A"]
+    end = time.time() + timeout
+    while time.time() < end:
+        ok = 0
+        for r in resolvers:
+            try:
+                req = urllib.request.Request(r.format(host), headers={"accept": "application/dns-json"})
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    if json.loads(resp.read().decode()).get("Answer"):
+                        ok += 1
+            except Exception:
+                pass
+        if ok == len(resolvers):
+            return True
+        time.sleep(4)
+    return False
+
+
+_sync_lock = threading.Lock()
+
+
 def sync_registry(ctx: Ctx) -> None:
     s = ctx.settings.data
-    if not (s.registry_url and s.shop_id and ctx.tunnel.public_url) or s.public_url:
+    url = ctx.tunnel.public_url
+    if not (s.registry_url and s.shop_id and url) or s.public_url:
         return
-    from .registry import send_heartbeat
-    err = send_heartbeat(s.registry_url, s.shop_id, ctx.tunnel.public_url, s.registry_secret, s.shop_name)
-    ctx.registry_status = "ok" if not err else f"error: {err}"
+    with _sync_lock:
+        if getattr(ctx, "dns_checked_url", None) != url:
+            ctx.registry_status = "" if ctx.registry_status != "ok" else ctx.registry_status
+            if not dns_ready(url):
+                logger.warning("Tunnel name %s not in public DNS yet; will retry", url)
+                return
+            ctx.dns_checked_url = url
+        from .registry import send_heartbeat
+        err = send_heartbeat(s.registry_url, s.shop_id, url, s.registry_secret, s.shop_name)
+        ctx.registry_status = "ok" if not err else f"error: {err}"
+        if err:
+            logger.warning("Permanent QR update failed: %s", err)
