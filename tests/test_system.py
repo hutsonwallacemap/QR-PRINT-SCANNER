@@ -460,7 +460,7 @@ def which_page(page) -> int:
 @pytest.mark.skipif(not HAS_PDF_PRINTER, reason="needs Windows + Microsoft Print to PDF")
 def test_manual_two_sided_real_print(env):
     c = env["client"]
-    env["settings"].update(counter_payment="print_first", manual_duplex=True)
+    env["settings"].update(counter_payment="print_first", duplex_mode="auto")
     assert c.get("/api/shop").json()["caps"]["duplex_mode"] == "manual"
     up = upload(c, "five.pdf", marked_pdf(5))
     o = c.post("/api/orders", json={"pay_method": "counter", "items": [
@@ -475,3 +475,52 @@ def test_manual_two_sided_real_print(env):
     assert done["status"] == "printed", done["message"]
     with fitz.open(env["out"] / f"{o['token']}_0_side2.pdf") as d:
         assert [which_page(pg) for pg in d] == [2, 4, 0, 2, 4]          # backs; blank behind copy 1's page 5
+
+
+def test_colour_and_bw_go_to_their_own_printers(env, monkeypatch):
+    if not HAS_PDF_PRINTER:
+        pytest.skip("needs two installed printers")
+    c, s = env["client"], env["settings"]
+    s.update(counter_payment="print_first", printer_name=PDF_PRINTER, printer_color="Microsoft XPS Document Writer")
+    used = []
+    monkeypatch.setattr(printer, "print_document",
+                        lambda path, target, spec, **k: used.append((target, spec.color)) or len(spec.page_indices))
+    a, b = upload(c, "notes.pdf"), upload(c, "photo.pdf")
+    o = c.post("/api/orders", json={"pay_method": "counter", "items": [
+        {"upload_id": a["upload_id"], "color_mode": "bw"},
+        {"upload_id": b["upload_id"], "color_mode": "color"}]}).json()
+    wait_status(env, o["id"], ["printed", "failed"])
+    assert used == [(PDF_PRINTER, False), ("Microsoft XPS Document Writer", True)]
+
+
+def test_two_sided_modes(env, monkeypatch):
+    c, s, orders = env["client"], env["settings"], env["orders"]
+    up = upload(c)
+    item = {"upload_id": up["upload_id"], "sides": "long"}
+    s.update(duplex_mode="off")
+    assert c.get("/api/shop").json()["caps"]["duplex"] is False
+    assert c.post("/api/quote", json={"items": [item]}).status_code == 400
+    # a printer that really flips paper: automatic = no hand turning; "manual" forces it anyway
+    monkeypatch.setattr(orders, "caps_of", lambda name: {"color": True, "duplex": True, "papers": ["A4"]})
+    s.update(duplex_mode="auto")
+    assert c.get("/api/shop").json()["caps"]["duplex_mode"] == "auto"
+    assert not orders.flips_by_hand("any")
+    s.update(duplex_mode="manual")
+    assert c.get("/api/shop").json()["caps"]["duplex_mode"] == "manual"
+    assert orders.flips_by_hand("any")
+
+
+def test_customer_sees_queue_position(env, monkeypatch):
+    c = env["client"]
+    env["orders"].stop()  # keep orders queued
+    time.sleep(2.5)
+    env["settings"].update(counter_payment="print_first")
+    made = []
+    for _ in range(3):
+        up = upload(c)
+        made.append(c.post("/api/orders", json={"pay_method": "counter",
+                                                "items": [{"upload_id": up["upload_id"]}]}).json())
+        time.sleep(0.01)
+    last = made[-1]
+    r = c.get(f"/api/orders/{last['id']}?k={last['access_key']}").json()
+    assert r["status"] == "queued" and r["queue_ahead"] == 2

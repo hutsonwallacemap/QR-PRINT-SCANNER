@@ -274,6 +274,8 @@ def create_app(ctx: Ctx) -> FastAPI:
         out = public_order(o)
         if include_key:
             out["access_key"] = o["access_key"]
+        if o["status"] in ("queued", "waiting_approval"):
+            out["queue_ahead"] = ctx.db.queue_ahead(o)
         if o["status"] == "awaiting_payment":
             if o["pay_method"] == "razorpay":
                 out["razorpay"] = {"key_id": s.razorpay_key_id, "order_id": o["rzp_order_id"],
@@ -389,6 +391,7 @@ def create_app(ctx: Ctx) -> FastAPI:
             "version": __version__,
             "settings": s.public_view(),
             "active_printer": orders.active_printer(),
+            "color_printer": orders.printer_for(True),
             "printers": printers,
             "caps": orders.printer_caps(),
             "customer_url": ctx.customer_url(),
@@ -466,7 +469,7 @@ def create_app(ctx: Ctx) -> FastAPI:
                     changes[k] = round(max(0.0, min(float(changes[k]), 10000.0)), 2)
                 except (TypeError, ValueError):
                     raise HTTPException(400, f"{k} must be a number.")
-        for k in ("auto_print", "accepting_orders", "enable_tunnel", "manual_duplex", "manual_duplex_reverse"):
+        for k in ("auto_print", "accepting_orders", "enable_tunnel", "manual_duplex_reverse"):
             if k in changes:
                 changes[k] = bool(changes[k])
         for k in ("shop_name", "shop_phone", "shop_address", "upi_id", "upi_payee_name", "public_url",
@@ -479,9 +482,16 @@ def create_app(ctx: Ctx) -> FastAPI:
                 changes.pop("razorpay_key_secret")
             else:
                 changes["razorpay_key_secret"] = sec
-        if changes.get("printer_name"):
-            if changes["printer_name"] not in {p["name"] for p in printer.list_printers()}:
-                raise HTTPException(400, "That printer is not installed on this PC.")
+        installed = None
+        for k in ("printer_name", "printer_color"):
+            if k in changes:
+                changes[k] = str(changes[k] or "").strip()[:200]
+                if changes[k]:
+                    installed = installed or {p["name"] for p in printer.list_printers()}
+                    if changes[k] not in installed:
+                        raise HTTPException(400, "That printer is not installed on this PC.")
+        if "duplex_mode" in changes and changes["duplex_mode"] not in ("auto", "manual", "off"):
+            raise HTTPException(400, "Invalid 2-sided setting.")
         if "counter_payment" in changes and changes["counter_payment"] not in ("off", "confirm", "print_first"):
             raise HTTPException(400, "Invalid counter payment mode.")
         if "allowed_paper_sizes" in changes:

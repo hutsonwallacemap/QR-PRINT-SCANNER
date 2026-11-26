@@ -68,8 +68,10 @@ class Settings:
     auto_print: bool = True            # print as soon as payment is confirmed
     accepting_orders: bool = True
     allowed_paper_sizes: List[str] = field(default_factory=lambda: ["A4"])
-    # 2-sided on printers that can't flip paper: print fronts, shopkeeper turns the stack, print backs
-    manual_duplex: bool = True
+    printer_color: str = ""            # optional 2nd printer for colour jobs ("" = same printer)
+    # 2-sided: "auto" = printer flips if it can, otherwise the shopkeeper turns the stack by hand;
+    #          "manual" = always by hand (for printers that wrongly claim 2-sided); "off" = 1-sided only
+    duplex_mode: str = "auto"
     manual_duplex_reverse: bool = False   # turn on if backs come out in the wrong order
 
     # Prices in rupees per printed side

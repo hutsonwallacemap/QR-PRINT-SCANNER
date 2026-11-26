@@ -257,6 +257,16 @@ class Database:
         )
         return self.get_order(row["id"]) if row else None
 
+    def queue_ahead(self, order: Dict[str, Any]) -> int:
+        """How many paid orders will print before this one."""
+        mine = order.get("paid_at") or order["created_at"]
+        row = self._one(
+            "SELECT COUNT(*) AS n FROM orders WHERE id<>? AND status IN ('queued','printing','waiting_flip') "
+            "AND COALESCE(paid_at, created_at) < ?",
+            [order["id"], mine],
+        )
+        return int(row["n"]) if row else 0
+
     def orders_needing_file_cleanup(self, older_than: float) -> List[Dict[str, Any]]:
         rows = self._all(
             "SELECT * FROM orders WHERE files_deleted=0 AND status IN ('printed','cancelled','expired','failed') "

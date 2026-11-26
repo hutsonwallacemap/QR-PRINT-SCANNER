@@ -101,13 +101,16 @@ async function loadState() {
   const s = state.settings;
   $("tShop").textContent = s.shop_name;
   const pr = state.printers.find((p) => p.name === state.active_printer);
-  $("tPrinter").innerHTML = pr ? `<span class="dot ${pr.ok ? "" : "bad"}"></span>${esc(pr.name)} · ${esc(pr.status)}` : "No printer selected";
+  const cp = state.color_printer !== state.active_printer ? state.printers.find((p) => p.name === state.color_printer) : null;
+  $("tPrinter").innerHTML = (pr ? `<span class="dot ${pr.ok ? "" : "bad"}"></span>${esc(pr.name)} · ${esc(pr.status)}` : "No printer selected")
+    + (cp ? ` &nbsp; <span class="dot ${cp.ok ? "" : "bad"}"></span>Colour: ${esc(cp.name)} · ${esc(cp.status)}` : "");
   $("tAccepting").checked = s.accepting_orders;
   $("tAuto").checked = s.auto_print;
   $("soundBtn").textContent = soundOn ? "🔔 Sound on" : "🔕 Sound off";
 
   // alerts
   const alerts = [];
+  if (cp && !cp.ok) alerts.push(["bad", `Colour printer problem: ${cp.status}.`]);
   if (!pr) alerts.push(["bad", "No printer is selected — open 'Printer & prices'."]);
   else if (!pr.ok) alerts.push(["bad", `Printer problem: ${pr.status}. Orders will wait/fail until fixed.`]);
   else if (pr.virtual) alerts.push(["", `"${pr.name}" is not a real printer. Choose your actual printer in 'Printer & prices'.`]);
@@ -129,11 +132,21 @@ async function loadState() {
   $("razorpay_key_secret").placeholder = s.razorpay_secret_set ? "•••••••• saved (type to change)" : "Key secret";
   $("rzpPill").hidden = !(s.razorpay_key_id && s.razorpay_secret_set);
   $("enable_tunnel").checked = s.enable_tunnel;
-  $("manual_duplex").checked = s.manual_duplex;
   $("manual_duplex_reverse").checked = s.manual_duplex_reverse;
-  const caps = state.caps || {};
-  $("duplexInfo").textContent = caps.auto_duplex ? "This printer prints 2-sided by itself."
-    : "This printer can't flip paper. With this on, it prints the fronts, then asks you to turn the stack over.";
+  if (document.activeElement !== $("duplex_mode")) $("duplex_mode").value = s.duplex_mode || "auto";
+  const real = state.printers.filter((p) => !p.virtual || p.name === s.printer_color);
+  if (document.activeElement !== $("printer_color")) {
+    $("printer_color").innerHTML = `<option value="">Same printer as B&amp;W</option>` +
+      real.filter((p) => p.name !== state.active_printer).map((p) =>
+        `<option value="${esc(p.name)}" ${p.name === s.printer_color ? "selected" : ""}>${esc(p.name)}${p.caps.color ? "" : " (B&W only!)"}</option>`).join("");
+  }
+  const targets = [...new Set([state.active_printer, state.color_printer])].filter(Boolean);
+  $("duplexInfo").textContent = s.duplex_mode === "off" ? "Customers only see 1-sided."
+    : targets.map((n) => {
+        const p = state.printers.find((x) => x.name === n);
+        const auto = p && p.caps.duplex && s.duplex_mode === "auto";
+        return `${n}: ${auto ? "flips paper by itself" : "you turn the pages over when asked"}`;
+      }).join(" · ");
   $("autostart").checked = state.autostart.enabled;
   $("autostart").disabled = !state.autostart.supported;
   $("papers").innerHTML = state.paper_sizes.map((p) =>
@@ -176,7 +189,8 @@ async function saveSettings(obj, msg = "Saved") {
 $("tAccepting").addEventListener("change", (e) => saveSettings({ accepting_orders: e.target.checked }, e.target.checked ? "Taking orders" : "Paused — customers see 'closed'"));
 $("tAuto").addEventListener("change", (e) => saveSettings({ auto_print: e.target.checked }, e.target.checked ? "Auto-print on" : "Auto-print off — you approve each order"));
 $("enable_tunnel").addEventListener("change", () => {});
-$("manual_duplex").addEventListener("change", (e) => saveSettings({ manual_duplex: e.target.checked }, e.target.checked ? "2-sided (you turn pages) is on" : "2-sided is off for this printer"));
+$("duplex_mode").addEventListener("change", (e) => saveSettings({ duplex_mode: e.target.value }, "2-sided setting saved"));
+$("printer_color").addEventListener("change", (e) => saveSettings({ printer_color: e.target.value }, e.target.value ? `Colour jobs → ${e.target.value}` : "Colour jobs use the same printer"));
 $("manual_duplex_reverse").addEventListener("change", (e) => saveSettings({ manual_duplex_reverse: e.target.checked }));
 $("closeApp").addEventListener("click", async () => {
   const btn = $("closeApp");

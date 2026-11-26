@@ -67,16 +67,37 @@ class OrderService:
     def active_printer(self) -> str:
         return self.settings.data.printer_name or printer.default_printer()
 
+    def printer_for(self, color: bool) -> str:
+        """Colour jobs go to the colour printer when the shop has set one."""
+        s = self.settings.data
+        if color and s.printer_color and printer.printer_info(s.printer_color):
+            return s.printer_color
+        return self.active_printer()
+
+    @staticmethod
+    def caps_of(name: str) -> Dict[str, Any]:
+        info = printer.printer_info(name)
+        return dict(info["caps"]) if info else {"color": True, "duplex": False, "papers": ["A4"]}
+
+    def flips_by_hand(self, target: str) -> bool:
+        mode = self.settings.data.duplex_mode
+        return mode == "manual" or (mode == "auto" and not self.caps_of(target).get("duplex"))
+
     def printer_caps(self) -> Dict[str, Any]:
-        info = printer.printer_info(self.active_printer())
-        caps = dict(info["caps"]) if info else {"color": True, "duplex": False, "papers": ["A4"]}
+        """What customers can choose, across the B&W and colour printers."""
+        main, col = self.active_printer(), self.printer_for(True)
+        mcaps, ccaps = self.caps_of(main), self.caps_of(col)
         allowed = [p for p in self.settings.data.allowed_paper_sizes if p in PAPER_SIZES]
-        caps["papers"] = [p for p in allowed if p in caps.get("papers", allowed)] or ["A4"]
-        caps["auto_duplex"] = bool(caps.get("duplex"))
-        manual = not caps["auto_duplex"] and self.settings.data.manual_duplex
-        caps["duplex"] = caps["auto_duplex"] or manual
-        caps["duplex_mode"] = "auto" if caps["auto_duplex"] else ("manual" if manual else "none")
-        return caps
+        papers = [p for p in allowed if p in mcaps.get("papers", allowed) and p in ccaps.get("papers", allowed)]
+        mode = self.settings.data.duplex_mode
+        by_hand = any(self.flips_by_hand(t) for t in {main, col})
+        return {
+            "color": bool(ccaps.get("color", True)),
+            "papers": papers or ["A4"],
+            "duplex": mode != "off",
+            "duplex_mode": "none" if mode == "off" else ("manual" if by_hand else "auto"),
+            "auto_duplex": not by_hand,
+        }
 
     # ── uploads ───────────────────────────────────────────────────────
     def stage_upload(self, filename: str, src_file, max_bytes: int = MAX_FILE_MB * 1024 * 1024) -> StagedUpload:
@@ -147,7 +168,7 @@ class OrderService:
             if sides not in ("one", "long", "short"):
                 sides = "one"
             if sides != "one" and not caps.get("duplex"):
-                raise OrderError("This shop's printer can't print on both sides.")
+                raise OrderError("This shop is printing 1-sided only right now.")
             try:
                 copies = int(req.get("copies", 1))
             except (TypeError, ValueError):
@@ -398,17 +419,18 @@ class OrderService:
         if not self.db.transition(oid, ["queued"], status="printing", message="Printing..."):
             return
         self.worker_state = f"printing #{order['token']}"
-        target = self.active_printer()
-        self.db.update_order(oid, printer_name=target)
+        used = sorted({self.printer_for(it["color_mode"] == "color") for it in order["items"]})
+        self.db.update_order(oid, printer_name=" + ".join(used))
         failed = []
         for it in order["items"]:
             if it["status"] == "printed":
                 continue
+            target = self.printer_for(it["color_mode"] == "color")
             self.db.update_item(it["id"], status="printing", error="")
             try:
                 indices = documents.parse_page_range(it["page_range"], it["total_pages"])
                 two_sided = it["sides"] != "one"
-                manual = two_sided and not self.printer_caps()["auto_duplex"]
+                manual = two_sided and self.flips_by_hand(target)
                 side = None
                 if manual:
                     side1, side2 = printer.manual_duplex_sequences(
@@ -458,7 +480,8 @@ class OrderService:
                 logger.exception("Printing failed for order %s item %s", oid, it["id"])
                 msg = str(exc) or exc.__class__.__name__
                 if "pywintypes" in repr(type(exc)) or isinstance(exc, OSError) or "StartDoc" in msg:
-                    msg = f"Printer error ({msg}). Check the printer is switched on, connected and has paper, then press Retry."
+                    msg = (f"Printer error on {target} ({msg}). Check it is switched on, connected and has paper, "
+                           "then press Retry.")
                 self.db.update_item(it["id"], status="failed", error=msg[:300])
                 failed.append(msg)
         if failed:

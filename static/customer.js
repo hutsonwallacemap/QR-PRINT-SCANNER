@@ -406,13 +406,40 @@ function checkUpiMissing() {
 }
 window.addEventListener("hashchange", checkUpiMissing);
 
+// ── ready alert: phone may be in a pocket ──
+let lastStatus = null;
+function readyAlert(token) {
+  try { navigator.vibrate && navigator.vibrate([250, 120, 250, 120, 400]); } catch {}
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.2, 0.4].forEach((t, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = [660, 880, 1100][i]; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.18);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2);
+    });
+  } catch {}
+  toast(`Token #${token} is ready - collect it at the counter`, 8000);
+}
+
 // ── status ──
 const FINAL = ["printed", "cancelled", "expired"];
 function renderStatus() {
   if (!order) return;
   const o = order;
   $("token").textContent = "#" + o.token;
-  $("statusLine").textContent = o.message || "";
+  const ahead = o.queue_ahead;
+  $("statusLine").textContent = (o.message || "") +
+    (ahead ? ` · ${ahead} order${ahead > 1 ? "s" : ""} ahead of you` : "");
+  if (shop && shop.phone) {
+    $("helpLine").hidden = false;
+    $("shopTel").textContent = shop.phone;
+    $("shopTel").href = "tel:" + shop.phone.replace(/[^\d+]/g, "");
+  }
+  if (lastStatus && lastStatus !== "printed" && o.status === "printed") readyAlert(o.token);
+  lastStatus = o.status;
   const st = o.status;
   const paidish = o.paid || ["queued", "printing", "printed", "waiting_approval", "waiting_flip"].includes(st);
   const marks = {

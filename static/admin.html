@@ -60,9 +60,17 @@
         <div id="printers"></div>
         <button class="btn outline block" id="testPrint">Print a test page</button>
         <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-        <label class="toggle"><input type="checkbox" id="manual_duplex"><span class="sw"></span>Offer 2-sided printing</label>
-        <p class="muted small" id="duplexInfo" style="margin:6px 0 10px"></p>
-        <label class="toggle"><input type="checkbox" id="manual_duplex_reverse"><span class="sw"></span>Backs come out in the wrong order</label>
+        <div class="field form"><div class="label">Colour jobs print on</div>
+          <select id="printer_color"></select>
+          <div class="hint">Have a B&amp;W laser and a colour inkjet? Pick the colour one here; B&amp;W jobs stay on the printer ticked above.</div></div>
+        <div class="field form"><div class="label">2-sided printing</div>
+          <select id="duplex_mode">
+            <option value="auto">Automatic (recommended)</option>
+            <option value="manual">Always turn pages by hand</option>
+            <option value="off">Off (1-sided only)</option>
+          </select>
+          <div class="hint" id="duplexInfo"></div></div>
+        <label class="toggle"><input type="checkbox" id="manual_duplex_reverse"><span class="sw"></span>Hand-turned backs come out in the wrong order</label>
         <p class="muted small" style="margin:6px 0 0">Test once with a 4-page document. Turn this on only if page 2 ends up behind page 3.</p>
       </div>
       <div class="card form">
