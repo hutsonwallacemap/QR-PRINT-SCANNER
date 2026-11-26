@@ -66,6 +66,22 @@ def default_printer() -> str:
         return names[0] if names else ""
 
 
+_caps_cache: Dict[Tuple[str, str, str], Tuple[float, Dict[str, object]]] = {}
+CAPS_SECONDS = 30 * 60
+
+
+def _cached_capabilities(name: str, port: str, driver: str) -> Dict[str, object]:
+    """Colour / 2-sided / paper support hardly ever changes, but asking the driver
+    is slow (0.5 s+ per printer, more for some Epson/HP drivers). Remember it."""
+    key = (name, port, driver)
+    hit = _caps_cache.get(key)
+    if hit and time.time() - hit[0] < CAPS_SECONDS:
+        return dict(hit[1])
+    caps = _capabilities(name, port)
+    _caps_cache[key] = (time.time(), caps)
+    return dict(caps)
+
+
 def _capabilities(name: str, port: str) -> Dict[str, object]:
     caps: Dict[str, object] = {"color": True, "duplex": False, "papers": list(DMPAPER)}
     try:
@@ -105,7 +121,7 @@ def _status_text(status: int, attributes: int) -> Tuple[str, bool]:
 
 _cache: Dict[str, object] = {"t": 0.0, "v": None}
 _cache_lock = threading.Lock()
-CACHE_SECONDS = 4.0
+CACHE_SECONDS = 3.0  # status only; capabilities are cached separately
 
 
 def list_printers(fresh: bool = False) -> List[Dict[str, object]]:
@@ -145,7 +161,7 @@ def _enumerate() -> List[Dict[str, object]]:
             "ok": ok,
             "jobs": p.get("cJobs", 0),
             "virtual": virtual,
-            "caps": _capabilities(name, port),
+            "caps": _cached_capabilities(name, port, p.get("pDriverName", "")),
         })
     out.sort(key=lambda x: (x["virtual"], not x["is_default"], str(x["name"]).lower()))
     return out

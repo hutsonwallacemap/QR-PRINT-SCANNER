@@ -80,9 +80,32 @@ function addFiles(list) {
     if (!shop.extensions.includes(ext)) { item.status = "error"; item.error = "This file type can't be printed."; }
     else if (f.size > shop.limits.max_file_mb * 1048576) { item.status = "error"; item.error = `Larger than ${shop.limits.max_file_mb} MB.`; }
     files.push(item);
-    if (item.status === "uploading") upload(item);
+    if (item.status === "uploading") shrinkPhoto(item.file).then((f) => { item.file = f; item.name = f.name; upload(item); });
   }
   renderFiles();
+}
+
+// Phone photos are 4-8 MB; over 4G that is the slowest part. Shrink to full A4
+// print quality (3508 px = 297 mm at 300 dpi) on the phone before sending.
+const PRINT_MAX_PX = 3508;
+async function shrinkPhoto(file) {
+  try {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.2 * 1048576 || !window.createImageBitmap) return file;
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, PRINT_MAX_PX / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const g = canvas.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);   // transparent PNGs print on white anyway
+    g.drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.(jpe?g|png|webp)$/i, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;  // any problem: send the original
+  }
 }
 
 function upload(item) {
@@ -318,6 +341,53 @@ $("claimPaid").addEventListener("click", async () => {
   } catch (e) { toast(e.message); } finally { btn.disabled = false; }
 });
 
+// ── UPI apps ──
+// A plain upi:// link opens whatever app the phone set as default (often WhatsApp).
+// On Android an intent link with a package opens that exact app; iPhone uses each app's own scheme.
+const UPI_APPS = [
+  { name: "Google Pay", pkg: "com.google.android.apps.nbu.paisa.user", ios: "gpay://upi/pay" },
+  { name: "PhonePe", pkg: "com.phonepe.app", ios: "phonepe://pay" },
+  { name: "Paytm", pkg: "net.one97.paytm", ios: "paytmmp://pay" },
+  { name: "BHIM", pkg: "in.org.npci.upiapp", ios: "bhim://upi/pay" },
+  { name: "YONO SBI", pkg: "com.sbi.lotusintouch" },
+  { name: "Amazon Pay", pkg: "in.amazon.mShop.android.shopping" },
+  { name: "CRED", pkg: "com.dreamplug.androidapp", ios: "credpay://upi/pay" },
+  { name: "WhatsApp", pkg: "com.whatsapp" },
+  { name: "iMobile", sub: "ICICI", pkg: "com.csam.icici.bank.imobile" },
+  { name: "HDFC Bank", pkg: "com.snapwork.hdfc" },
+  { name: "Axis", pkg: "com.axis.mobile" },
+  { name: "Kotak", pkg: "com.msf.kbank.mobile" },
+];
+const IS_ANDROID = /android/i.test(navigator.userAgent);
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+let upiRenderedFor = "";
+
+function renderUpiApps(uri) {
+  if (upiRenderedFor === uri) return;
+  upiRenderedFor = uri;
+  const query = uri.split("?")[1] || "";
+  const back = encodeURIComponent(location.href.split("#")[0] + "#upi-app-missing");
+  let html = "";
+  if (IS_ANDROID) {
+    html = UPI_APPS.map((a) =>
+      `<a href="intent://pay?${query}#Intent;scheme=upi;package=${a.pkg};S.browser_fallback_url=${back};end">${esc(a.name)}${a.sub ? `<small>${esc(a.sub)}</small>` : ""}</a>`).join("");
+    html += `<a class="any" href="intent://pay?${query}#Intent;scheme=upi;end">Any UPI app (bank apps, others)</a>`;
+  } else if (IS_IOS) {
+    html = UPI_APPS.filter((a) => a.ios).map((a) => `<a href="${a.ios}?${query}">${esc(a.name)}</a>`).join("");
+    html += `<a class="any" href="${esc(uri)}">Any UPI app</a>`;
+  }
+  $("upiApps").innerHTML = html;
+  $("upiApps").previousElementSibling.hidden = !html;  // "Tap the app you use" label
+  $("upiTip").hidden = !IS_ANDROID;
+}
+function checkUpiMissing() {
+  if (location.hash === "#upi-app-missing") {
+    toast("That app isn't on this phone. Tap another app, or scan the QR below.", 5000);
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+}
+window.addEventListener("hashchange", checkUpiMissing);
+
 // ── status ──
 const FINAL = ["printed", "cancelled", "expired"];
 function renderStatus() {
@@ -349,7 +419,7 @@ function renderStatus() {
   $("payAmt").textContent = rupees(o.amount_paise);
   $("cAmt").textContent = rupees(o.amount_paise); $("cTok").textContent = "#" + o.token;
   if (awaiting && o.upi) {
-    $("upiApp").href = o.upi.uri;
+    renderUpiApps(o.upi.uri);
     $("upiId").textContent = o.upi.upi_id;
     const src = `/api/orders/${o.id}/upi.png?k=${encodeURIComponent(current.k)}`;
     if ($("upiQr").getAttribute("src") !== src) $("upiQr").src = src;
@@ -389,6 +459,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && cu
 
 // ── boot ──
 (async function boot() {
+  checkUpiMissing();
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (saved && Date.now() - saved.t < 12 * 3600 * 1000) current = { id: saved.id, k: saved.k };

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import io
 import logging
 import os
@@ -155,6 +156,7 @@ def _soffice_to_pdf(src: Path, dst: Path) -> bool:
         return False
 
 
+@functools.lru_cache(maxsize=1)
 def office_converter_available() -> bool:
     if _find_soffice():
         return True

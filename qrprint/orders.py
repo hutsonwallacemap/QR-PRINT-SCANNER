@@ -362,6 +362,8 @@ class OrderService:
         for o in self.db.orders_with_status(["printing"]):
             self.db.update_order(o["id"], status="failed",
                                  message="Interrupted (PC restarted). Check the paper, then press Reprint.")
+        # Ask the printer drivers once now, so the first customer doesn't wait for it.
+        threading.Thread(target=printer.list_printers, daemon=True, name="warm-printers").start()
         for target in (self._print_loop, self._maintenance_loop):
             t = threading.Thread(target=target, daemon=True, name=target.__name__)
             t.start()

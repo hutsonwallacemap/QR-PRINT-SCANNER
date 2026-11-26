@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 import qrcode
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -159,6 +160,8 @@ class Heartbeat(BaseModel):
 def create_app(ctx: Ctx) -> FastAPI:
     app = FastAPI(title="QR Print Shop", version=__version__, docs_url=None, redoc_url=None)
     app.state.ctx = ctx
+    # Compress pages/scripts/JSON: noticeably faster for customers on 4G.
+    app.add_middleware(GZipMiddleware, minimum_size=800)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     S = ctx.settings
     orders = ctx.orders
