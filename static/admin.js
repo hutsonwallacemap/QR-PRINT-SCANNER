@@ -129,6 +129,11 @@ async function loadState() {
   $("razorpay_key_secret").placeholder = s.razorpay_secret_set ? "•••••••• saved (type to change)" : "Key secret";
   $("rzpPill").hidden = !(s.razorpay_key_id && s.razorpay_secret_set);
   $("enable_tunnel").checked = s.enable_tunnel;
+  $("manual_duplex").checked = s.manual_duplex;
+  $("manual_duplex_reverse").checked = s.manual_duplex_reverse;
+  const caps = state.caps || {};
+  $("duplexInfo").textContent = caps.auto_duplex ? "This printer prints 2-sided by itself."
+    : "This printer can't flip paper. With this on, it prints the fronts, then asks you to turn the stack over.";
   $("autostart").checked = state.autostart.enabled;
   $("autostart").disabled = !state.autostart.supported;
   $("papers").innerHTML = state.paper_sizes.map((p) =>
@@ -171,6 +176,15 @@ async function saveSettings(obj, msg = "Saved") {
 $("tAccepting").addEventListener("change", (e) => saveSettings({ accepting_orders: e.target.checked }, e.target.checked ? "Taking orders" : "Paused — customers see 'closed'"));
 $("tAuto").addEventListener("change", (e) => saveSettings({ auto_print: e.target.checked }, e.target.checked ? "Auto-print on" : "Auto-print off — you approve each order"));
 $("enable_tunnel").addEventListener("change", () => {});
+$("manual_duplex").addEventListener("change", (e) => saveSettings({ manual_duplex: e.target.checked }, e.target.checked ? "2-sided (you turn pages) is on" : "2-sided is off for this printer"));
+$("manual_duplex_reverse").addEventListener("change", (e) => saveSettings({ manual_duplex_reverse: e.target.checked }));
+$("closeApp").addEventListener("click", async () => {
+  const btn = $("closeApp");
+  if (btn.dataset.armed !== "1") { btn.dataset.armed = "1"; btn.textContent = "Tap again to close"; setTimeout(() => { btn.dataset.armed = ""; btn.textContent = "Close QR Print Shop"; }, 4000); return; }
+  try { await api("/api/admin/shutdown", { method: "POST" }); } catch {}
+  stopPolling();
+  document.body.innerHTML = '<div class="login"><div class="card"><div class="big-ico">✅</div><h2>QR Print Shop is closed</h2><p class="muted">Customers now see "shop is offline". To start again, double-click <b>QRPrintShop.exe</b> or the QR Print Shop icon.</p></div></div>';
+});
 document.querySelectorAll("[data-save]").forEach((btn) => btn.addEventListener("click", async () => {
   const body = {};
   for (const k of btn.dataset.save.split(",")) {
@@ -216,11 +230,11 @@ $("changePin").addEventListener("click", async () => {
 
 // ── orders ──
 const STATUS_LABEL = {
-  awaiting_payment: "Awaiting payment", waiting_approval: "Waiting for you", queued: "Queued", printing: "Printing",
+  awaiting_payment: "Awaiting payment", waiting_approval: "Waiting for you", waiting_flip: "Turn pages over", queued: "Queued", printing: "Printing",
   printed: "Printed", failed: "Failed", cancelled: "Cancelled", expired: "Expired",
 };
 function needsAttention(o) {
-  return o.status === "waiting_approval" || o.status === "failed" ||
+  return o.status === "waiting_approval" || o.status === "failed" || o.status === "waiting_flip" ||
     (o.status === "awaiting_payment" && (o.pay_method === "counter" || o.customer_claimed_paid));
 }
 
@@ -266,16 +280,22 @@ function renderOrders(list, el, actions) {
     if (actions) {
       if (o.status === "awaiting_payment") btns += `<button class="btn sm ok" data-act="confirm" data-id="${o.id}">Paid ✓ ${o.pay_method === "razorpay" ? "(manual)" : ""}</button>`;
       if (o.status === "waiting_approval") btns += `<button class="btn sm ok" data-act="print" data-id="${o.id}">Print now</button>`;
+      if (o.status === "waiting_flip") btns += `<button class="btn sm ok" data-act="flip" data-id="${o.id}">Pages turned → Print backs</button>`;
       if (["printed", "failed", "cancelled", "expired"].includes(o.status) && !o.files_deleted && (o.paid || o.status !== "expired"))
         btns += `<button class="btn sm" data-act="print" data-id="${o.id}">${o.status === "failed" ? "Retry" : "Reprint"}</button>`;
       if (o.status === "printed" && !o.paid && o.amount_paise) btns += `<button class="btn sm ok" data-act="confirm" data-id="${o.id}">Cash received</button>`;
-      if (["awaiting_payment", "waiting_approval", "queued", "failed"].includes(o.status)) btns += `<button class="btn sm bad" data-act="cancel" data-id="${o.id}">Cancel</button>`;
+      if (["awaiting_payment", "waiting_approval", "waiting_flip", "queued", "failed"].includes(o.status)) btns += `<button class="btn sm bad" data-act="cancel" data-id="${o.id}">Cancel</button>`;
     }
     return `<div class="order ${attn ? "attn" : ""} ${o.status === "failed" ? "failed" : ""}">
       <div><div class="tok">#${o.token}</div><div class="when">${timeOf(o.created_at)}</div></div>
       <div><div class="who">${esc(o.customer_name || "Customer")} <span class="pill ${o.status}">${STATUS_LABEL[o.status] || o.status}</span></div>
         <div class="items">${items}</div>
         <div class="msg ${o.status === "failed" ? "bad" : ""}">${esc(o.message)}</div>
+        ${o.status === "waiting_flip" ? `<div class="flipbox"><b>Front sides are printed.</b><ol>
+          <li>Take all printed sheets from the output tray. Keep them in the same order.</li>
+          <li>Turn the whole stack over (blank sides now face the way the fronts did).</li>
+          <li>Put it back in the paper tray with the same top edge going in first.</li>
+          <li>Press <b>Print backs</b>.</li></ol></div>` : ""}
         ${o.customer_claimed_paid && o.status === "awaiting_payment" ? `<div class="claimed">Customer says paid${o.payment_ref ? " · UTR " + esc(o.payment_ref) : ""} — check your UPI app</div>` : ""}
       </div>
       <div class="right"><div class="amt">${rupees(o.amount_paise)}</div>
@@ -293,7 +313,7 @@ $("orders").addEventListener("click", async (e) => {
       !confirm(`Confirm you received ${rupees(o.amount_paise)} for token #${o.token}? It will print immediately.`)) return;
   b.disabled = true;
   try {
-    const path = { confirm: "confirm-payment", print: "print", cancel: "cancel" }[b.dataset.act];
+    const path = { confirm: "confirm-payment", print: "print", cancel: "cancel", flip: "flip-done" }[b.dataset.act];
     await api(`/api/admin/orders/${b.dataset.id}/${path}`, { method: "POST", body: JSON.stringify({}) });
     rev = -1; loadOrders();
   } catch (ex) { toast(ex.message, 5000); b.disabled = false; }

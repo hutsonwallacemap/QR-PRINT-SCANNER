@@ -429,6 +429,12 @@ def create_app(ctx: Ctx) -> FastAPI:
         orders.admin_print(order_id)
         return {"ok": True}
 
+    @app.post("/api/admin/orders/{order_id}/flip-done")
+    def admin_flip(request: Request, order_id: str):
+        admin(request)
+        orders.admin_flip_done(order_id)
+        return {"ok": True}
+
     @app.post("/api/admin/orders/{order_id}/cancel")
     def admin_cancel(request: Request, order_id: str):
         admin(request)
@@ -460,7 +466,7 @@ def create_app(ctx: Ctx) -> FastAPI:
                     changes[k] = round(max(0.0, min(float(changes[k]), 10000.0)), 2)
                 except (TypeError, ValueError):
                     raise HTTPException(400, f"{k} must be a number.")
-        for k in ("auto_print", "accepting_orders", "enable_tunnel"):
+        for k in ("auto_print", "accepting_orders", "enable_tunnel", "manual_duplex", "manual_duplex_reverse"):
             if k in changes:
                 changes[k] = bool(changes[k])
         for k in ("shop_name", "shop_phone", "shop_address", "upi_id", "upi_payee_name", "public_url",
@@ -504,6 +510,23 @@ def create_app(ctx: Ctx) -> FastAPI:
             ctx.registry_status = ""
             threading.Thread(target=sync_registry, args=(ctx,), daemon=True).start()
         return {"ok": True, "settings": s.public_view()}
+
+    @app.post("/api/admin/shutdown")
+    def shutdown(request: Request):
+        """Close the app from the dashboard (no Task Manager needed, e.g. before an update)."""
+        admin(request)
+        logger.info("Closed from the dashboard")
+
+        def _bye() -> None:
+            time.sleep(0.8)  # let this response reach the browser
+            try:
+                orders.stop()
+                ctx.tunnel.stop()
+            finally:
+                os._exit(0)
+
+        threading.Thread(target=_bye, daemon=True).start()
+        return {"ok": True}
 
     @app.post("/api/admin/razorpay-check")
     def razorpay_check(request: Request):

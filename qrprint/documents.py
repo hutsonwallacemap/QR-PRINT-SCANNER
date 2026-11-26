@@ -273,8 +273,12 @@ def thumbnail_png(print_path: Path, page_index: int = 0, max_side: int = 360) ->
 
 # ── Rendering for print ───────────────────────────────────────────────
 
+BLANK = -1  # page index meaning "feed a sheet with nothing on it" (manual 2-sided)
+
+
 def page_sizes(print_path: Path, indices: List[int]) -> List[Tuple[float, float]]:
     """(width, height) of each selected page, any unit - used to pick orientation."""
+    indices = [i for i in indices if i >= 0]
     ext = print_path.suffix.lower()
     if ext in PDF_EXT:
         with fitz.open(print_path) as doc:
@@ -292,13 +296,16 @@ def page_sizes(print_path: Path, indices: List[int]) -> List[Tuple[float, float]
         return out
 
 
-def render_pages(print_path: Path, indices: List[int], dpi: int, grayscale: bool) -> Iterator[Image.Image]:
+def render_pages(print_path: Path, indices: List[int], dpi: int, grayscale: bool) -> Iterator[Optional[Image.Image]]:
     """Yield one page image at a time, so a 300-page PDF never sits in RAM at once."""
     ext = print_path.suffix.lower()
     mode = "L" if grayscale else "RGB"
     if ext in PDF_EXT:
         with fitz.open(print_path) as doc:
             for i in indices:
+                if i < 0:
+                    yield None
+                    continue
                 page = doc.load_page(i)
                 zoom = dpi / 72.0
                 # keep huge pages (posters) to a sane pixel count
@@ -314,6 +321,9 @@ def render_pages(print_path: Path, indices: List[int], dpi: int, grayscale: bool
         return
     with Image.open(print_path) as img:
         for i in indices:
+            if i < 0:
+                yield None
+                continue
             if getattr(img, "n_frames", 1) > 1:
                 img.seek(i)
             frame = ImageOps.exif_transpose(img)

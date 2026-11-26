@@ -186,3 +186,9 @@ input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px va
 .upiapps a:active { transform: scale(.97); }
 .upiapps a.any { grid-column: 1 / -1; min-height: 48px; flex-direction: row; background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
 @media (max-width: 340px) { .upiapps { grid-template-columns: repeat(2, 1fr); } }
+
+.pagemode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.pagemode button { min-height: 36px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: .85rem; cursor: pointer; }
+.pagemode button.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.flipbox { background: var(--warn-soft); color: #78350f; border-radius: 10px; padding: 10px 12px; margin-top: 8px; font-size: .88rem; }
+.flipbox ol { margin: 4px 0 0; padding-left: 1.2em; }

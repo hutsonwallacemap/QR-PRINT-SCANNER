@@ -182,10 +182,36 @@ def printer_info(name: str) -> Optional[Dict[str, object]]:
 
 # ── Printing ──────────────────────────────────────────────────────────
 
-def _fit(img_w: int, img_h: int, box_w: int, box_h: int) -> Tuple[int, int, int, int]:
-    scale = min(box_w / img_w, box_h / img_h)
-    w, h = max(1, int(img_w * scale)), max(1, int(img_h * scale))
-    x, y = (box_w - w) // 2, (box_h - h) // 2
+@dataclass
+class PageGeometry:
+    """All in printer dots. The DC origin (0,0) is the top-left of the PRINTABLE area,
+    which sits off_x/off_y dots inside the physical sheet."""
+    phys_w: int
+    phys_h: int
+    off_x: int
+    off_y: int
+    print_w: int
+    print_h: int
+
+
+def place(img_w: int, img_h: int, g: PageGeometry, document: bool) -> Tuple[int, int, int, int]:
+    """Where to draw a page image, in printable-area coordinates.
+
+    document=True (PDF/Word/TXT): true size on the physical sheet, exactly like the
+    original - the printer just can't reach its few mm of hardware margin.
+    document=False (photos): as large as fits inside the printable area, centred on
+    the SHEET (not on the uneven printable area), so nothing is cut off.
+    """
+    if document:
+        scale = min(g.phys_w / img_w, g.phys_h / img_h)
+    else:
+        scale = min(g.print_w / img_w, g.print_h / img_h)
+    w, h = max(1, round(img_w * scale)), max(1, round(img_h * scale))
+    x = round((g.phys_w - w) / 2) - g.off_x
+    y = round((g.phys_h - h) / 2) - g.off_y
+    if not document:  # keep the whole photo inside what the printer can print
+        x = min(max(x, 0), g.print_w - w)
+        y = min(max(y, 0), g.print_h - h)
     return x, y, x + w, y + h
 
 
@@ -262,6 +288,14 @@ def print_document(
         try:
             page_w = dc.GetDeviceCaps(win32con.HORZRES)
             page_h = dc.GetDeviceCaps(win32con.VERTRES)
+            geo = PageGeometry(
+                phys_w=dc.GetDeviceCaps(win32con.PHYSICALWIDTH) or page_w,
+                phys_h=dc.GetDeviceCaps(win32con.PHYSICALHEIGHT) or page_h,
+                off_x=dc.GetDeviceCaps(win32con.PHYSICALOFFSETX),
+                off_y=dc.GetDeviceCaps(win32con.PHYSICALOFFSETY),
+                print_w=page_w, print_h=page_h,
+            )
+            is_document = print_path.suffix.lower() == ".pdf"
             dpi = min(dc.GetDeviceCaps(win32con.LOGPIXELSX) or 300, MAX_RENDER_DPI)
             if output_file:
                 dc.StartDoc(job_title[:120], output_file)
@@ -272,7 +306,10 @@ def print_document(
                 for copy in range(copies):
                     pages_this_copy = 0
                     for img in documents.render_pages(print_path, spec.page_indices, dpi, not spec.color):
-                        _draw_page(dc, img, page_w, page_h)
+                        if img is None:
+                            _blank_sheet(dc)
+                        else:
+                            _draw_page(dc, img, geo, is_document)
                         pages_this_copy += 1
                         sent += 1
                         if on_progress:
@@ -293,12 +330,41 @@ def print_document(
             dc.DeleteDC()
 
 
-def _draw_page(dc, img: Image.Image, page_w: int, page_h: int) -> None:
-    # Rotate content that doesn't match the paper orientation, then scale to fit.
-    if (img.width > img.height) != (page_w > page_h) and abs(img.width - img.height) > min(img.size) * 0.05:
+def _blank_sheet(dc) -> None:
+    """Feed one sheet with (almost) nothing on it. A single light-grey dot stops
+    drivers that skip empty pages, which would shift every following back side."""
+    dc.StartPage()
+    try:
+        dot = Image.new("RGB", (4, 4), (232, 232, 232))  # same drawing path as real pages
+        ImageWin.Dib(dot).draw(dc.GetHandleOutput(), (0, 0, 4, 4))
+    finally:
+        dc.EndPage()
+
+
+def manual_duplex_sequences(pages: List[int], copies: int, reverse_backs: bool = False) -> Tuple[List[int], List[int]]:
+    """Page order for 2-sided on a printer that can't flip paper itself.
+
+    Side 1: fronts (1st, 3rd, 5th... selected page) for every copy.
+    Side 2: backs (2nd, 4th...) for every copy; a copy with an odd page count gets a
+    blank back so the next copy's backs land on the right sheets.
+    """
+    fronts = pages[0::2]
+    backs = pages[1::2] + ([documents.BLANK] if len(pages) % 2 else [])
+    side1 = fronts * copies
+    side2 = backs * copies
+    while side2 and side2[-1] == documents.BLANK:   # nothing left to print on the last sheet
+        side2.pop()
+    if reverse_backs:
+        side2.reverse()
+    return side1, side2
+
+
+def _draw_page(dc, img: Image.Image, geo: PageGeometry, document: bool) -> None:
+    # Rotate content that doesn't match the paper orientation, then place it.
+    if (img.width > img.height) != (geo.phys_w > geo.phys_h) and abs(img.width - img.height) > min(img.size) * 0.05:
         img = img.rotate(90, expand=True)
     dc.StartPage()
     try:
-        ImageWin.Dib(img).draw(dc.GetHandleOutput(), _fit(img.width, img.height, page_w, page_h))
+        ImageWin.Dib(img).draw(dc.GetHandleOutput(), place(img.width, img.height, geo, document))
     finally:
         dc.EndPage()

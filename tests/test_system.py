@@ -391,3 +391,87 @@ def test_permanent_qr_updates_even_if_dns_check_is_blocked(env, monkeypatch):
 def test_https_helper_trusts_bundled_certificates():
     from qrprint.net import ssl_context
     assert ssl_context().cert_store_stats()["x509_ca"] > 100
+
+
+def test_page_lands_where_it_is_on_the_original():
+    """Alignment bug: pages were shrunk into the printable area and centred on it,
+    so with uneven printer margins everything moved. Now true size on the sheet."""
+    g = printer.PageGeometry(phys_w=2977, phys_h=4209, off_x=42, off_y=42,   # A4 @ 360 dpi, 3 mm margins
+                             print_w=2977 - 84, print_h=4209 - 42 - 198)     # 14 mm bottom margin
+    x0, y0, x1, y1 = printer.place(2480, 3508, g, document=True)            # A4 page rendered at 300 dpi
+    # physical position = drawn position + offset -> must be the sheet's own corner and full size
+    assert abs((x0 + g.off_x) - 0) <= 1 and abs((y0 + g.off_y) - 0) <= 1
+    assert abs((x1 - x0) - 2977) <= 2 and abs((y1 - y0) - 4209) <= 3
+    # photos: fully inside the printable area, centred on the sheet horizontally
+    px0, py0, px1, py1 = printer.place(4000, 3000, g, document=False)
+    assert px0 >= 0 and py0 >= 0 and px1 <= g.print_w and py1 <= g.print_h
+    assert abs(((px0 + px1) / 2 + g.off_x) - g.phys_w / 2) <= 1
+
+
+def test_manual_duplex_page_order():
+    side1, side2 = printer.manual_duplex_sequences([0, 1, 2, 3], copies=1)
+    assert side1 == [0, 2] and side2 == [1, 3]
+    # odd pages, 2 copies: copy 1's last sheet needs a blank back so copy 2 lines up
+    side1, side2 = printer.manual_duplex_sequences([0, 1, 2], copies=2)
+    assert side1 == [0, 2, 0, 2] and side2 == [1, documents.BLANK, 1]
+    assert printer.manual_duplex_sequences([0, 1, 2, 3], 1, reverse_backs=True)[1] == [3, 1]
+    assert printer.manual_duplex_sequences([0], 1)[1] == []
+
+
+def test_old_database_is_upgraded(tmp_path):
+    import sqlite3
+    old = tmp_path / "old.db"
+    con = sqlite3.connect(old)
+    con.executescript("CREATE TABLE items (id TEXT PRIMARY KEY, order_id TEXT, position INTEGER, filename TEXT,"
+                      " stored_path TEXT, print_path TEXT, total_pages INTEGER, page_range TEXT, selected_pages INTEGER,"
+                      " color_mode TEXT, sides TEXT, copies INTEGER, orientation TEXT, paper_size TEXT, sheets INTEGER,"
+                      " amount_paise INTEGER, status TEXT, pages_printed INTEGER, error TEXT);")
+    con.close()
+    db = Database(old)
+    cols = [r["name"] for r in db._all("PRAGMA table_info(items)")]
+    assert "phase" in cols
+    db.close()
+
+
+def test_close_app_needs_login(env):
+    assert env["client"].post("/api/admin/shutdown", headers={"X-Admin": "1"}).status_code == 401
+
+
+def marked_pdf(pages: int) -> bytes:
+    """Page i has a black square at a position unique to i (printed output is an image, no text)."""
+    doc = fitz.open()
+    for i in range(pages):
+        p = doc.new_page(width=595, height=842)
+        p.draw_rect(fitz.Rect(40 + i * 90, 300, 100 + i * 90, 360), color=(0, 0, 0), fill=(0, 0, 0))
+    return doc.tobytes()
+
+
+def which_page(page) -> int:
+    """Read back the square's position: page number 1.., or 0 for a blank sheet."""
+    pix = page.get_pixmap(dpi=20, colorspace=fitz.csGRAY)
+    w = pix.width
+    dark = [x for y in range(pix.height) for x in range(w) if pix.samples[y * w + x] < 80]
+    if not dark:
+        return 0
+    cx = sum(dark) / len(dark) / w * 595          # back to PDF points
+    return round((cx - 70) / 90) + 1
+
+
+@pytest.mark.skipif(not HAS_PDF_PRINTER, reason="needs Windows + Microsoft Print to PDF")
+def test_manual_two_sided_real_print(env):
+    c = env["client"]
+    env["settings"].update(counter_payment="print_first", manual_duplex=True)
+    assert c.get("/api/shop").json()["caps"]["duplex_mode"] == "manual"
+    up = upload(c, "five.pdf", marked_pdf(5))
+    o = c.post("/api/orders", json={"pay_method": "counter", "items": [
+        {"upload_id": up["upload_id"], "sides": "long", "copies": 2}]}).json()
+    mid = wait_status(env, o["id"], ["waiting_flip", "failed"], timeout=120)
+    assert mid["status"] == "waiting_flip", mid["message"]
+    with fitz.open(env["out"] / f"{o['token']}_0_side1.pdf") as d:
+        assert [which_page(pg) for pg in d] == [1, 3, 5, 1, 3, 5]      # fronts, 2 copies
+    h = login(c)
+    assert c.post(f"/api/admin/orders/{o['id']}/flip-done", headers=h).status_code == 200
+    done = wait_status(env, o["id"], ["printed", "failed"], timeout=120)
+    assert done["status"] == "printed", done["message"]
+    with fitz.open(env["out"] / f"{o['token']}_0_side2.pdf") as d:
+        assert [which_page(pg) for pg in d] == [2, 4, 0, 2, 4]          # backs; blank behind copy 1's page 5

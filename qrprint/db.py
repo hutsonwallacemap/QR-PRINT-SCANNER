@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS items (
     amount_paise    INTEGER NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending',
     pages_printed   INTEGER NOT NULL DEFAULT 0,
-    error           TEXT NOT NULL DEFAULT ''
+    error           TEXT NOT NULL DEFAULT '',
+    phase           INTEGER NOT NULL DEFAULT 0      -- manual 2-sided: 1 = fronts printed
 );
 CREATE INDEX IF NOT EXISTS idx_items_order ON items(order_id);
 
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS counters (
 ORDER_STATUSES = {
     "awaiting_payment",   # waiting for customer payment / shopkeeper confirmation
     "waiting_approval",   # paid (or print-first) but auto-print is off
+    "waiting_flip",       # manual 2-sided: fronts printed, shopkeeper turns the stack over
     "queued",
     "printing",
     "printed",
@@ -91,7 +93,14 @@ class Database:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self.revision = 0  # bumps on every change; admin page polls cheaply
+
+    def _migrate(self) -> None:
+        """Upgrade databases created by older versions (shops keep their history)."""
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(items)").fetchall()}
+        if "phase" not in cols:
+            self._conn.execute("ALTER TABLE items ADD COLUMN phase INTEGER NOT NULL DEFAULT 0")
 
     # ── low level ──
     def _exec(self, sql: str, params: Iterable[Any] = ()) -> sqlite3.Cursor:
@@ -192,7 +201,7 @@ class Database:
     def reset_items(self, order_id: str) -> None:
         with self._lock:
             self._exec(
-                "UPDATE items SET status='pending', pages_printed=0, error='' WHERE order_id=?",
+                "UPDATE items SET status='pending', pages_printed=0, error='', phase=0 WHERE order_id=?",
                 [order_id],
             )
             self._bump()
@@ -262,7 +271,7 @@ class Database:
             SELECT
               COUNT(*) AS orders,
               SUM(CASE WHEN status='printed' THEN 1 ELSE 0 END) AS printed,
-              SUM(CASE WHEN status IN ('awaiting_payment','waiting_approval','queued','printing') THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN status IN ('awaiting_payment','waiting_approval','waiting_flip','queued','printing') THEN 1 ELSE 0 END) AS pending,
               SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
               SUM(CASE WHEN paid=1 THEN amount_paise ELSE 0 END) AS collected_paise,
               SUM(CASE WHEN paid=1 AND pay_method='razorpay' THEN amount_paise ELSE 0 END) AS online_paise,

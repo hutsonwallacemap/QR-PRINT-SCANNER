@@ -59,6 +59,11 @@
         <p class="muted small">Customers' files go to this printer.</p>
         <div id="printers"></div>
         <button class="btn outline block" id="testPrint">Print a test page</button>
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <label class="toggle"><input type="checkbox" id="manual_duplex"><span class="sw"></span>Offer 2-sided printing</label>
+        <p class="muted small" id="duplexInfo" style="margin:6px 0 10px"></p>
+        <label class="toggle"><input type="checkbox" id="manual_duplex_reverse"><span class="sw"></span>Backs come out in the wrong order</label>
+        <p class="muted small" style="margin:6px 0 0">Test once with a 4-page document. Turn this on only if page 2 ends up behind page 3.</p>
       </div>
       <div class="card form">
         <h3 class="card-title">Prices (₹ per printed side)</h3>
@@ -185,7 +190,13 @@
       <div class="field"><input id="curPin" type="password" inputmode="numeric" placeholder="Current PIN"></div>
       <div class="field"><input id="newPin" type="password" inputmode="numeric" placeholder="New PIN (4-12 digits)"></div>
       <button class="btn primary block" id="changePin">Change PIN</button>
-      <p class="muted small">Data folder and version: <span id="verInfo"></span></p>
+      <p class="muted small">Version: <span id="verInfo"></span></p>
+    </div>
+    <div class="card form" style="max-width:420px">
+      <h3 class="card-title">Close the app</h3>
+      <p class="muted small">Stops QR Print Shop on this computer, for example before installing a new version. Customers
+        will see "shop is offline" until you start it again.</p>
+      <button class="btn bad block" id="closeApp">Close QR Print Shop</button>
     </div>
   </section>
 </div>

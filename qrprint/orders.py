@@ -26,7 +26,7 @@ from .payments import PaymentError, Razorpay
 logger = logging.getLogger("qrprint.orders")
 
 UPLOAD_TTL = 3 * 3600
-OPEN_STATUSES = ("awaiting_payment", "waiting_approval", "queued", "printing", "failed")
+OPEN_STATUSES = ("awaiting_payment", "waiting_approval", "waiting_flip", "queued", "printing", "failed")
 
 
 class OrderError(ValueError):
@@ -72,6 +72,10 @@ class OrderService:
         caps = dict(info["caps"]) if info else {"color": True, "duplex": False, "papers": ["A4"]}
         allowed = [p for p in self.settings.data.allowed_paper_sizes if p in PAPER_SIZES]
         caps["papers"] = [p for p in allowed if p in caps.get("papers", allowed)] or ["A4"]
+        caps["auto_duplex"] = bool(caps.get("duplex"))
+        manual = not caps["auto_duplex"] and self.settings.data.manual_duplex
+        caps["duplex"] = caps["auto_duplex"] or manual
+        caps["duplex_mode"] = "auto" if caps["auto_duplex"] else ("manual" if manual else "none")
         return caps
 
     # ── uploads ───────────────────────────────────────────────────────
@@ -348,6 +352,12 @@ class OrderService:
                              printer_name=self.active_printer(), completed_at=None)
         self._wake.set()
 
+    def admin_flip_done(self, order_id: str) -> None:
+        """The shopkeeper put the printed stack back in the tray: print the back sides."""
+        if not self.db.transition(order_id, ["waiting_flip"], status="queued", message="Printing the back sides"):
+            raise OrderError("This order is not waiting for pages to be turned over.")
+        self._wake.set()
+
     def admin_cancel(self, order_id: str) -> None:
         order = self.db.get_order(order_id)
         if not order:
@@ -397,13 +407,24 @@ class OrderService:
             self.db.update_item(it["id"], status="printing", error="")
             try:
                 indices = documents.parse_page_range(it["page_range"], it["total_pages"])
+                two_sided = it["sides"] != "one"
+                manual = two_sided and not self.printer_caps()["auto_duplex"]
+                side = None
+                if manual:
+                    side1, side2 = printer.manual_duplex_sequences(
+                        indices, it["copies"], self.settings.data.manual_duplex_reverse)
+                    side = 1 if it.get("phase", 0) == 0 else 2
+                    indices, copies = (side1 if side == 1 else side2), 1
+                else:
+                    copies = it["copies"]
                 spec = printer.PrintSpec(
-                    color=it["color_mode"] == "color", duplex=it["sides"], copies=it["copies"],
+                    color=it["color_mode"] == "color", duplex="one" if manual else it["sides"], copies=copies,
                     orientation=it["orientation"], paper_size=it["paper_size"], page_indices=indices,
                 )
                 out_file = None
                 if self.print_output_dir is not None:
-                    out_file = str(self.print_output_dir / f"{order['token']}_{it['position']}.pdf")
+                    suffix = f"_side{side}" if side else ""
+                    out_file = str(self.print_output_dir / f"{order['token']}_{it['position']}{suffix}.pdf")
                 elif printer.asks_for_filename(target):
                     VIRTUAL_PRINT_DIR.mkdir(parents=True, exist_ok=True)
                     stem = "".join(ch if ch.isalnum() or ch in " -_" else "_" for ch in Path(it["filename"]).stem)[:60]
@@ -417,12 +438,22 @@ class OrderService:
                         self.db.update_item(_id, pages_printed=done)
                         self.db.update_order(oid, message=f"Printing {it['filename']} - page {done} of {total}")
 
+                if not indices:  # e.g. 1-page file "2-sided": nothing for side 2
+                    self.db.update_item(it["id"], status="printed", phase=0)
+                    continue
                 sent = printer.print_document(
                     Path(it["print_path"]), target, spec,
-                    job_title=f"Token {order['token']} - {it['filename']}",
+                    job_title=f"Token {order['token']} - {it['filename']}" + (f" (side {side})" if side else ""),
                     output_file=out_file, on_progress=progress,
                 )
-                self.db.update_item(it["id"], status="printed", pages_printed=sent)
+                if side == 1 and printer.manual_duplex_sequences(
+                        documents.parse_page_range(it["page_range"], it["total_pages"]), it["copies"])[1]:
+                    # Fronts done: the shopkeeper turns the stack over, then presses "Print backs".
+                    self.db.update_item(it["id"], status="pending", phase=1, pages_printed=sent)
+                    self.db.update_order(oid, status="waiting_flip",
+                                         message="Front sides printed - the shop is turning the pages for the backs")
+                    return
+                self.db.update_item(it["id"], status="printed", phase=0)
             except Exception as exc:
                 logger.exception("Printing failed for order %s item %s", oid, it["id"])
                 msg = str(exc) or exc.__class__.__name__

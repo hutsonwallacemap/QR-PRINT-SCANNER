@@ -59,6 +59,7 @@ async function loadShop() {
     $("colorNote").hidden = false;
   }
   $("sidesField").hidden = !shop.caps.duplex;
+  $("manualNote").hidden = shop.caps.duplex_mode !== "manual";
   const paper = $("paper");
   paper.innerHTML = shop.caps.papers.map((x) => `<option>${esc(x)}</option>`).join("");
   opts.paper_size = shop.caps.papers[0];
@@ -146,8 +147,13 @@ function renderFiles() {
     } else {
       meta = `${f.pages} page${f.pages > 1 ? "s" : ""}`;
       if (f.pages > 1) {
-        body = `<div class="frange"><label for="r_${f.key}">Pages</label>
-          <input id="r_${f.key}" data-key="${f.key}" class="rangeIn" placeholder="All (e.g. 1-3, 5)" value="${esc(f.range)}" inputmode="text"></div>`;
+        const custom = f.mode === "custom";
+        body = `<div class="pagemode" role="group" aria-label="Pages to print">
+            <button type="button" data-mode="all" data-key="${f.key}" class="${custom ? "" : "on"}">All ${f.pages} pages</button>
+            <button type="button" data-mode="custom" data-key="${f.key}" class="${custom ? "on" : ""}">Choose pages</button>
+          </div>
+          <div class="frange" ${custom ? "" : "hidden"}><label for="r_${f.key}">Pages</label>
+            <input id="r_${f.key}" data-key="${f.key}" class="rangeIn" placeholder="e.g. 1-3, 5" value="${esc(f.range)}" inputmode="text"></div>`;
       }
     }
     const thumb = f.status === "ready" ? `<img src="/api/uploads/${f.upload_id}/preview.png" alt="" loading="lazy">` : fileIcon(f.name);
@@ -157,6 +163,12 @@ function renderFiles() {
   }).join("");
   list.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
     files = files.filter((f) => f.key !== b.dataset.del); renderFiles();
+  }));
+  list.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
+    const f = files.find((x) => x.key === b.dataset.key); if (!f) return;
+    f.mode = b.dataset.mode;
+    renderFiles();
+    if (f.mode === "custom") { const inp = $("r_" + f.key); if (inp) inp.focus(); }
   }));
   list.querySelectorAll(".rangeIn").forEach((inp) => inp.addEventListener("input", () => {
     const f = files.find((x) => x.key === inp.dataset.key); if (f) f.range = inp.value;
@@ -169,6 +181,9 @@ function renderFiles() {
   btn.disabled = !ready.length || busy;
   btn.textContent = busy ? "Uploading…" : ready.length ? `Continue with ${ready.length} file${ready.length > 1 ? "s" : ""}` : "Continue";
 }
+
+// "All pages" unless the customer picked "Choose pages" and typed something
+const rangeOf = (f) => (f.mode === "custom" && f.range.trim()) ? f.range.trim() : "all";
 
 // client-side page-range count (server re-checks everything)
 function countRange(spec, total) {
@@ -192,7 +207,10 @@ function countRange(spec, total) {
 
 $("toOptions").addEventListener("click", () => {
   for (const f of files.filter((x) => x.status === "ready")) {
-    if (countRange(f.range, f.pages) === null) {
+    if (f.mode === "custom" && !f.range.trim()) {
+      showErr("filesErr", `${f.name}: type the pages to print (e.g. 1-3, 5) or choose "All pages".`); return;
+    }
+    if (countRange(rangeOf(f), f.pages) === null) {
       showErr("filesErr", `${f.name}: page range "${f.range}" is not valid. Example: 1-3, 5`); return;
     }
   }
@@ -225,7 +243,7 @@ function rate() {
 function updateOptionTotals() {
   if (!shop) return;
   const ready = files.filter((f) => f.status === "ready");
-  const sides = ready.reduce((a, f) => a + (countRange(f.range, f.pages) || 0), 0) * opts.copies;
+  const sides = ready.reduce((a, f) => a + (countRange(rangeOf(f), f.pages) || 0), 0) * opts.copies;
   let total = Math.round(sides * rate() * 100);
   if (total > 0 && shop.prices.min_order) total = Math.max(total, Math.round(shop.prices.min_order * 100));
   $("optPages").textContent = `${sides} page${sides !== 1 ? "s" : ""} × ₹${rate()}`;
@@ -234,7 +252,7 @@ function updateOptionTotals() {
 
 function itemsPayload() {
   return files.filter((f) => f.status === "ready").map((f) => ({
-    upload_id: f.upload_id, page_range: f.range.trim() || "all", color_mode: opts.color_mode, sides: opts.sides,
+    upload_id: f.upload_id, page_range: rangeOf(f), color_mode: opts.color_mode, sides: opts.sides,
     copies: opts.copies, paper_size: opts.paper_size, orientation: opts.orientation,
   }));
 }
@@ -396,11 +414,11 @@ function renderStatus() {
   $("token").textContent = "#" + o.token;
   $("statusLine").textContent = o.message || "";
   const st = o.status;
-  const paidish = o.paid || ["queued", "printing", "printed", "waiting_approval"].includes(st);
+  const paidish = o.paid || ["queued", "printing", "printed", "waiting_approval", "waiting_flip"].includes(st);
   const marks = {
     paid: st === "awaiting_payment" ? "now" : paidish ? "done" : "",
-    queued: st === "queued" || st === "waiting_approval" ? "now" : ["printing", "printed"].includes(st) ? "done" : "",
-    printing: st === "printing" ? "now" : st === "printed" ? "done" : st === "failed" ? "fail" : "",
+    queued: st === "queued" || st === "waiting_approval" ? "now" : ["printing", "printed", "waiting_flip"].includes(st) ? "done" : "",
+    printing: st === "printing" || st === "waiting_flip" ? "now" : st === "printed" ? "done" : st === "failed" ? "fail" : "",
     printed: st === "printed" ? "done" : "",
   };
   $("timeline").querySelectorAll("li").forEach((li) => { li.className = marks[li.dataset.t] || ""; });
@@ -408,7 +426,7 @@ function renderStatus() {
 
   const total = o.items.reduce((a, i) => a + i.selected_pages * i.copies, 0);
   const done = o.items.reduce((a, i) => a + (i.status === "printed" ? i.selected_pages * i.copies : i.pages_printed), 0);
-  $("progressWrap").hidden = !(st === "printing" || st === "printed");
+  $("progressWrap").hidden = !(st === "printing" || st === "printed" || st === "waiting_flip");
   $("progressBar").style.width = (total ? Math.min(100, (done / total) * 100) : 0) + "%";
 
   const awaiting = st === "awaiting_payment";
