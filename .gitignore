@@ -8,3 +8,5 @@ build/
 *.spec
 .claude/settings.local.json
 qr_registry.json
+bin/
+*.zip

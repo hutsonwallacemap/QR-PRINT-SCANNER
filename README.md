@@ -11,8 +11,8 @@ Works with **any printer installed in Windows** (USB, Wi-Fi, network, inkjet or 
 ## For shop owners: setup in 5 minutes
 
 1. Copy this folder to the shop PC (the one connected to the printer).
-2. Double-click **`Install.bat`**. It installs everything and puts a **QR Print Shop** icon on the Desktop.
-   (Or use the single-file **`QRPrintShop.exe`** if you were given one. No install is needed.)
+2. Easiest: copy **`QRPrintShop.exe`** (or `QRPrintShop.zip` sent on WhatsApp) to `C:\QRPrintShop\` and double-click it.
+   Nothing else to install: printing, payments and the 4G/5G link are all inside. (From source: `Install.bat`.)
 3. The dashboard opens. **Create a PIN** (only possible on the shop PC itself).
 4. **Printer & prices** tab: pick your printer, press **Print a test page**, then set your prices.
 5. **Payments** tab: set up at least one of these:
@@ -47,7 +47,7 @@ is the only reliable confirmation.
 Customers can scan with **their own mobile internet**. No shop Wi-Fi is needed.
 
 How it works:
-1. `cloudflared` (installed by Install.bat) gives the shop PC a free internet address
+1. Cloudflare's tunnel program is **built into QRPrintShop.exe** (nothing to install) and gives the shop PC a free internet address
    (`https://random-words.trycloudflare.com`). This address changes every time the PC restarts.
 2. The poster QR points to a **permanent link**, `https://qr-print-scanner-alpha.vercel.app/s/<shop-id>`.
 3. Every minute the shop PC tells that link its current address. Customers are forwarded there

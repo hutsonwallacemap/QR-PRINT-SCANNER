@@ -1,0 +1,577 @@
+<title>QR Print Shop Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a print-shop job ticket - narrow reading column, full-width diagram plates, CMYK as the signal colours */
+:root {
+  --paper: #f7f8f6; --sheet: #ffffff; --ink: #15191c; --muted: #5b6670; --rule: #d9dee2;
+  --cyan: #0a7ea4;      /* internet / network path */
+  --magenta: #c0266d;   /* money / payment path */
+  --yellow: #b8860b;    /* needs the shopkeeper */
+  --ok: #2f7d4f; --bad: #b3261e;
+  --cyan-soft: #e3f3f8; --magenta-soft: #fbe7f0; --yellow-soft: #fbf3dc;
+  --display: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #121517; --sheet: #1a1f22; --ink: #e8ecee; --muted: #9aa6ae; --rule: #2e363b;
+  --cyan: #4cc3e6; --magenta: #f06aa6; --yellow: #e5b84a; --ok: #5cc28a; --bad: #f07a70;
+  --cyan-soft: #12313c; --magenta-soft: #3a1828; --yellow-soft: #3a3016; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #121517; --sheet: #1a1f22; --ink: #e8ecee; --muted: #9aa6ae; --rule: #2e363b;
+  --cyan: #4cc3e6; --magenta: #f06aa6; --yellow: #e5b84a; --ok: #5cc28a; --bad: #f07a70;
+  --cyan-soft: #12313c; --magenta-soft: #3a1828; --yellow-soft: #3a3016; color-scheme: dark }
+
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.3rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 800; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+.eyebrow { font: 500 .78rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+section { display: grid; gap: 18px; min-width: 0; }
+.lead { font-size: 1.12rem; color: var(--muted); }
+
+/* header as a job ticket with registration marks */
+.ticket { position: relative; background: var(--sheet); border: 1px solid var(--rule); padding: 36px clamp(20px, 4vw, 44px); display: grid; gap: 18px; }
+.reg { position: absolute; width: 18px; height: 18px; }
+.reg::before, .reg::after { content: ""; position: absolute; background: var(--ink); }
+.reg::before { left: 8px; top: 0; width: 1.5px; height: 18px; }
+.reg::after { top: 8px; left: 0; height: 1.5px; width: 18px; }
+.reg.tl { top: 10px; left: 10px; } .reg.tr { top: 10px; right: 10px; } .reg.bl { bottom: 10px; left: 10px; } .reg.br { bottom: 10px; right: 10px; }
+.cmyk { display: flex; gap: 0; height: 8px; width: 160px; }
+.cmyk span { flex: 1; } .cmyk span:nth-child(1) { background: var(--cyan); } .cmyk span:nth-child(2) { background: var(--magenta); }
+.cmyk span:nth-child(3) { background: var(--yellow); } .cmyk span:nth-child(4) { background: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 .8rem var(--mono); padding: 4px 10px; border: 1px solid var(--rule); background: var(--paper); }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .92rem; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1.5px solid var(--rule); }
+nav.toc a:hover, nav.toc a:focus-visible { border-color: var(--cyan); outline: none; }
+
+/* diagram plates */
+figure { margin: 0; background: var(--sheet); border: 1px solid var(--rule); display: grid; gap: 0; min-width: 0; }
+.plate { overflow-x: auto; padding: 18px; }
+.plate svg { display: block; width: 100%; min-width: 900px; height: auto; color: var(--ink); }
+.plate.narrow svg { min-width: 640px; }
+figcaption { border-top: 1px solid var(--rule); padding: 12px 18px; font-size: .9rem; color: var(--muted); }
+.mermaid { margin: 0; background: transparent; min-width: 640px; }
+
+/* svg classes (themed from page tokens) */
+.box { fill: var(--sheet); stroke: currentColor; stroke-width: 1.4; }
+.box.soft { fill: var(--paper); }
+.box.net { stroke: var(--cyan); fill: var(--cyan-soft); }
+.box.pay { stroke: var(--magenta); fill: var(--magenta-soft); }
+.box.attn { stroke: var(--yellow); fill: var(--yellow-soft); }
+.zone { fill: none; stroke: currentColor; stroke-width: 1; stroke-dasharray: 5 4; opacity: .55; }
+.t { fill: currentColor; font: 600 13px var(--body); }
+.s { fill: var(--muted); font: 400 11px var(--mono); }
+.l { fill: currentColor; font: 500 11px var(--mono); }
+.l.net { fill: var(--cyan); } .l.pay { fill: var(--magenta); }
+.zl { fill: var(--muted); font: 500 11px var(--mono); letter-spacing: .08em; }
+.w { fill: none; stroke: currentColor; stroke-width: 1.4; }
+.w.net { stroke: var(--cyan); } .w.pay { stroke: var(--magenta); stroke-dasharray: 6 4; }
+.w.beat { stroke: var(--cyan); stroke-dasharray: 3 3; }
+.ah { fill: currentColor; } .ah.net { fill: var(--cyan); } .ah.pay { fill: var(--magenta); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 0 18px 14px; font-size: .85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 28px; height: 0; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 6px; }
+.legend i.net { border-color: var(--cyan); } .legend i.pay { border-color: var(--magenta); border-top-style: dashed; }
+.legend i.beat { border-color: var(--cyan); border-top-style: dotted; }
+
+/* tables */
+.tbl { overflow-x: auto; background: var(--sheet); border: 1px solid var(--rule); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 .74rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--paper); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap; }
+.tag { font: 600 .72rem var(--mono); padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+.tag.net { background: var(--cyan-soft); color: var(--cyan); } .tag.pay { background: var(--magenta-soft); color: var(--magenta); }
+.tag.loc { background: var(--paper); color: var(--muted); border: 1px solid var(--rule); }
+
+/* three payment cards */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.card { background: var(--sheet); border: 1px solid var(--rule); padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card.pay { border-top: 4px solid var(--magenta); } .card.attn { border-top: 4px solid var(--yellow); } .card.ink { border-top: 4px solid var(--ink); }
+.card ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: .92rem; }
+.verdict { font: 500 .8rem var(--mono); color: var(--muted); }
+
+.steps { counter-reset: s; display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+.steps li::before { content: counter(s); font: 600 .85rem var(--mono); width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--ink); }
+.note { border-left: 3px solid var(--yellow); background: var(--yellow-soft); padding: 12px 16px; font-size: .93rem; max-width: 80ch; }
+@media (prefers-reduced-motion: no-preference) { nav.toc a { transition: border-color .15s; } }
+</style>
+
+<div class="wrap">
+
+<header class="ticket">
+  <span class="reg tl"></span><span class="reg tr"></span><span class="reg bl"></span><span class="reg br"></span>
+  <div class="cmyk" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+  <div class="eyebrow">System blueprint · v4</div>
+  <h1>QR Print Shop</h1>
+  <p class="lead">A customer scans the poster, uploads files from their own phone, pays, and the shop's printer prints by
+    itself. This page shows every part, every connection between them, and every step an order goes through.</p>
+  <div class="chips">
+    <span class="chip">Windows PC + any printer</span><span class="chip">Port 8500</span>
+    <span class="chip">Wi-Fi or 4G/5G</span><span class="chip">Razorpay · UPI · Cash</span><span class="chip">Token #101, #102…</span>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#map">Connection map</a><a href="#reach">Reaching the shop</a><a href="#pay">Payments</a>
+    <a href="#states">Order states</a><a href="#print">Print pipeline</a><a href="#connections">All connections</a>
+    <a href="#timers">Timers &amp; limits</a><a href="#security">Security</a><a href="#data">Data &amp; files</a>
+  </nav>
+</header>
+
+<!-- 1. MAP -->
+<section id="map">
+  <div class="eyebrow">01 · Overview</div>
+  <h2>Connection map</h2>
+  <p>Everything runs on the shop PC except two outside services: the <b>registry</b> on Vercel, which gives every
+    shop a QR link that never changes, and <b>Razorpay</b>, which confirms online payments. Customers arrive by one of two
+    roads: shop Wi-Fi straight to the PC, or mobile data through the registry and a Cloudflare tunnel.</p>
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1080 640" role="img" aria-label="Customer phone reaches the shop PC either over shop Wi-Fi or over mobile data via the Vercel registry and a Cloudflare tunnel. Inside the PC, the web server feeds the order engine, database, files and print worker, which sends jobs through the Windows spooler to the printer. Razorpay confirms online payments; the shopkeeper uses the dashboard.">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="an" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah net" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah pay" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- zones -->
+        <rect class="zone" x="440" y="40" width="400" height="560"/>
+        <text class="zl" x="452" y="58">SHOP PC · QR PRINT SHOP APP</text>
+        <text class="zl" x="220" y="58">NETWORK</text>
+        <text class="zl" x="890" y="58">SHOP SIDE</text>
+
+        <!-- customer -->
+        <rect class="box" x="20" y="250" width="130" height="150" rx="14"/>
+        <text class="t" x="85" y="300" text-anchor="middle">Customer</text>
+        <text class="t" x="85" y="318" text-anchor="middle">phone</text>
+        <text class="s" x="85" y="342" text-anchor="middle">camera scans QR</text>
+        <text class="s" x="85" y="358" text-anchor="middle">browser page</text>
+        <rect class="box soft" x="20" y="470" width="130" height="60" rx="8"/>
+        <text class="t" x="85" y="496" text-anchor="middle">UPI app</text>
+        <text class="s" x="85" y="514" text-anchor="middle">GPay · PhonePe</text>
+
+        <!-- network -->
+        <rect class="box" x="220" y="90" width="170" height="60"/>
+        <text class="t" x="305" y="115" text-anchor="middle">Shop Wi-Fi router</text>
+        <text class="s" x="305" y="134" text-anchor="middle">192.168.x.x:8500</text>
+        <rect class="box net" x="220" y="330" width="170" height="64"/>
+        <text class="t" x="305" y="355" text-anchor="middle">Registry (Vercel)</text>
+        <text class="s" x="305" y="374" text-anchor="middle">/s/shop-id → 307</text>
+        <rect class="box net" x="220" y="440" width="170" height="64"/>
+        <text class="t" x="305" y="465" text-anchor="middle">Cloudflare tunnel</text>
+        <text class="s" x="305" y="484" text-anchor="middle">*.trycloudflare.com</text>
+
+        <!-- PC internals -->
+        <rect class="box" x="470" y="80" width="340" height="60"/>
+        <text class="t" x="640" y="105" text-anchor="middle">Web server · port 8500</text>
+        <text class="s" x="640" y="124" text-anchor="middle">customer page · dashboard · API</text>
+        <rect class="box" x="470" y="180" width="160" height="70"/>
+        <text class="t" x="550" y="208" text-anchor="middle">Order engine</text>
+        <text class="s" x="550" y="228" text-anchor="middle">price · pay · state</text>
+        <rect class="box" x="650" y="180" width="160" height="70"/>
+        <text class="t" x="730" y="208" text-anchor="middle">PIN &amp; sessions</text>
+        <text class="s" x="730" y="228" text-anchor="middle">admin only</text>
+        <rect class="box soft" x="470" y="290" width="160" height="60"/>
+        <text class="t" x="550" y="315" text-anchor="middle">SQLite database</text>
+        <text class="s" x="550" y="334" text-anchor="middle">orders · tokens</text>
+        <rect class="box soft" x="650" y="290" width="160" height="60"/>
+        <text class="t" x="730" y="315" text-anchor="middle">Customer files</text>
+        <text class="s" x="730" y="334" text-anchor="middle">deleted after 60 min</text>
+        <rect class="box" x="470" y="390" width="340" height="60"/>
+        <text class="t" x="640" y="415" text-anchor="middle">Print worker</text>
+        <text class="s" x="640" y="434" text-anchor="middle">one page at a time · printer settings applied</text>
+        <rect class="box net" x="470" y="490" width="160" height="60"/>
+        <text class="t" x="550" y="515" text-anchor="middle">cloudflared</text>
+        <text class="s" x="550" y="534" text-anchor="middle">tunnel client</text>
+        <rect class="box net" x="650" y="490" width="160" height="60"/>
+        <text class="t" x="730" y="515" text-anchor="middle">Heartbeat</text>
+        <text class="s" x="730" y="534" text-anchor="middle">every 60 s</text>
+
+        <!-- shop side -->
+        <rect class="box attn" x="890" y="80" width="170" height="60"/>
+        <text class="t" x="975" y="105" text-anchor="middle">Shopkeeper</text>
+        <text class="s" x="975" y="124" text-anchor="middle">dashboard /admin</text>
+        <rect class="box pay" x="890" y="230" width="170" height="64"/>
+        <text class="t" x="975" y="255" text-anchor="middle">Razorpay</text>
+        <text class="s" x="975" y="274" text-anchor="middle">confirms payment</text>
+        <rect class="box" x="890" y="390" width="170" height="60"/>
+        <text class="t" x="975" y="415" text-anchor="middle">Windows spooler</text>
+        <text class="s" x="975" y="434" text-anchor="middle">printer driver</text>
+        <rect class="box" x="890" y="490" width="170" height="60"/>
+        <text class="t" x="975" y="515" text-anchor="middle">Printer</text>
+        <text class="s" x="975" y="534" text-anchor="middle">USB · Wi-Fi · LAN</text>
+
+        <!-- Wi-Fi road -->
+        <path class="w" d="M150,285 L220,128" marker-end="url(#a)"/>
+        <text class="l" x="158" y="200">Wi-Fi</text>
+        <path class="w" d="M390,110 L470,100" marker-end="url(#a)"/>
+        <text class="l" x="402" y="96">LAN</text>
+
+        <!-- 4G road -->
+        <path class="w net" d="M150,362 L220,362" marker-end="url(#an)"/>
+        <text class="l net" x="156" y="352">4G/5G</text>
+        <path class="w net" d="M305,394 L305,440" marker-end="url(#an)"/>
+        <text class="l net" x="312" y="422">307 redirect</text>
+        <path class="w net" d="M390,520 L470,520" marker-end="url(#an)"/>
+        <text class="l net" x="398" y="512">tunnel</text>
+        <path class="w net" d="M470,530 H455 V125 H470" marker-end="url(#an)"/>
+        <text class="l net" x="446" y="300" transform="rotate(-90 446 300)" text-anchor="middle">forwards to :8500</text>
+
+        <!-- heartbeat -->
+        <path class="w beat" d="M730,550 V585 H410 V362 H390" marker-end="url(#an)"/>
+        <text class="l net" x="570" y="579" text-anchor="middle">"my address is …" every 60 s</text>
+
+        <!-- inside PC -->
+        <path class="w" d="M550,140 V180" marker-end="url(#a)"/>
+        <text class="l" x="556" y="164">orders</text>
+        <path class="w" d="M730,140 V180" marker-end="url(#a)"/>
+        <text class="l" x="736" y="164">admin calls</text>
+        <path class="w" d="M550,250 V290" marker-end="url(#a)"/>
+        <text class="l" x="556" y="274">saves</text>
+        <path class="w" d="M630,232 L650,296" marker-end="url(#a)"/>
+        <path class="w" d="M550,350 V390" marker-end="url(#a)"/>
+        <text class="l" x="556" y="374">next queued</text>
+        <path class="w" d="M730,350 V390" marker-end="url(#a)"/>
+        <text class="l" x="736" y="374">reads file</text>
+        <path class="w" d="M810,420 H890" marker-end="url(#a)"/>
+        <text class="l" x="818" y="412">print job</text>
+        <path class="w" d="M975,450 V490" marker-end="url(#a)"/>
+        <text class="l" x="981" y="474">paper</text>
+
+        <!-- shopkeeper -->
+        <path class="w" d="M890,110 H810" marker-end="url(#a)"/>
+        <text class="l" x="822" y="102">PIN login</text>
+
+        <!-- money -->
+        <path class="w pay" d="M630,262 V270 H860 V262 H890" marker-end="url(#ap)"/>
+        <text class="l pay" x="845" y="286" text-anchor="end">create · verify</text>
+        <path class="w pay" d="M85,400 V470" marker-end="url(#ap)"/>
+        <text class="l pay" x="92" y="440">pays</text>
+        <path class="w pay" d="M150,515 H200 V615 H1072 V262 H1060" marker-end="url(#ap)"/>
+        <text class="l pay" x="640" y="609" text-anchor="middle">Razorpay checkout opens inside the customer's page (online pay)</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i></i>local / Wi-Fi</span><span><i class="net"></i>internet road (4G/5G)</span>
+      <span><i class="beat"></i>heartbeat</span><span><i class="pay"></i>money</span>
+    </div>
+    <figcaption>The two roads meet at the same web server on port 8500. Only the heartbeat and Razorpay calls leave the PC on their own; everything else is a reply to a phone or the dashboard.</figcaption>
+  </figure>
+</section>
+
+<!-- 2. REACH -->
+<section id="reach">
+  <div class="eyebrow">02 · Network</div>
+  <h2>How a phone reaches the shop</h2>
+  <p>The free Cloudflare address changes every time the PC restarts, so the poster never shows it. The poster shows the
+    registry link, and the shop PC keeps the registry told where it is now.</p>
+  <figure>
+    <div class="plate"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant PC as Shop PC app
+    participant CF as Cloudflare
+    participant DNS as Public DNS (1.1.1.1 + 8.8.8.8)
+    participant REG as Registry (Vercel)
+    participant PH as Customer phone (4G)
+    Note over PC: App starts (or PC restarts)
+    PC->>CF: cloudflared asks for a quick tunnel
+    CF-->>PC: new address random-words.trycloudflare.com
+    loop until the name exists (max 90 s)
+        PC->>DNS: does the new name resolve?
+    end
+    PC->>REG: heartbeat {shop-id, address, secret}
+    REG-->>PC: 200 ok (secret matches this shop)
+    PH->>REG: scans poster → /s/shop-id
+    REG-->>PH: 307 redirect to the current address
+    PH->>CF: opens random-words.trycloudflare.com
+    CF->>PC: forwards through the tunnel to port 8500
+    PC-->>PH: customer page
+    loop every 60 s
+        PC->>REG: heartbeat (keeps the link alive)
+    end
+    Note over REG: No heartbeat for 3 min → "shop is offline" page
+    </pre></div>
+    <figcaption>On shop Wi-Fi the phone skips all of this and opens <code>http://192.168.x.x:8500</code> directly. If Cloudflare refuses a tunnel, the app retries after 15 s, 30 s, 1 min, 2 min, then every 5 min.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Road</th><th>QR contains</th><th>Works for</th><th>Changes?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag loc">Wi-Fi only</span></td><td class="num">http://192.168.1.6:8500</td><td>Phones on the shop Wi-Fi</td><td>If the router gives the PC a new IP. Fix it in the router.</td></tr>
+      <tr><td><span class="tag net">Permanent link</span></td><td class="num">https://qr-print-scanner-alpha.vercel.app/s/shop-id</td><td>Any phone, Wi-Fi or mobile data</td><td>Never. Default when cloudflared is installed.</td></tr>
+      <tr><td><span class="tag net">Own domain</span></td><td class="num">https://print.yourshop.in</td><td>Any phone</td><td>Never. Needs a named Cloudflare tunnel.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 3. PAYMENTS -->
+<section id="pay">
+  <div class="eyebrow">03 · Money</div>
+  <h2>Three ways to pay, and who releases the print</h2>
+  <p>A plain UPI link sends nothing back to the shop, so software cannot know if money arrived. Only Razorpay can
+    release a print by itself. The other two wait for one tap from the shopkeeper.</p>
+  <div class="cols">
+    <div class="card pay">
+      <h3>Razorpay</h3>
+      <div class="verdict">Print starts by itself</div>
+      <ol>
+        <li>Shop PC creates a Razorpay order for the exact amount.</li>
+        <li>Customer pays by UPI or card inside the page.</li>
+        <li>Razorpay returns a signature; the PC checks it with the shop's secret key.</li>
+        <li>Match → order goes to the print queue.</li>
+        <li>Page closed early? The PC asks Razorpay every 20 s.</li>
+      </ol>
+    </div>
+    <div class="card attn">
+      <h3>UPI ID</h3>
+      <div class="verdict">Shopkeeper taps Paid ✓</div>
+      <ol>
+        <li>Customer opens their UPI app with amount and token filled in.</li>
+        <li>Customer taps "I have paid" and can add the UTR.</li>
+        <li>Dashboard beeps: "Customer says paid · UTR …".</li>
+        <li>Shopkeeper checks the bank app, taps Paid ✓ → prints.</li>
+      </ol>
+    </div>
+    <div class="card ink">
+      <h3>Cash at counter</h3>
+      <div class="verdict">Shop chooses the rule</div>
+      <ol>
+        <li><b>Confirm first:</b> prints after Paid ✓.</li>
+        <li><b>Print first:</b> prints now, shopkeeper taps "Cash received" later.</li>
+        <li>Or turned off entirely.</li>
+      </ol>
+    </div>
+  </div>
+  <figure>
+    <div class="plate"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant PH as Customer page
+    participant PC as Shop PC
+    participant RZ as Razorpay
+    participant PR as Printer
+    PH->>PC: place order (files + options)
+    PC->>PC: price from shop's own rates
+    PC->>RZ: create order ₹ amount
+    RZ-->>PC: order_id
+    PC-->>PH: token #105 + order_id
+    PH->>RZ: customer pays in checkout
+    RZ-->>PH: payment_id + signature
+    PH->>PC: send payment_id + signature
+    PC->>PC: HMAC-SHA256(order_id|payment_id, secret) = signature?
+    alt signature matches
+        PC->>PR: queue and print
+        PC-->>PH: "Printing…" then "Ready"
+    else forged or broken
+        PC->>RZ: ask directly: was this order paid?
+        RZ-->>PC: no captured payment
+        PC-->>PH: "Payment could not be verified"
+    end
+    </pre></div>
+    <figcaption>Price is always worked out on the shop PC. What the phone sends is never trusted for the amount.</figcaption>
+  </figure>
+</section>
+
+<!-- 4. STATES -->
+<section id="states">
+  <div class="eyebrow">04 · Lifecycle</div>
+  <h2>Order states</h2>
+  <p>Every order is in exactly one state. Changes are atomic, so two payment signals arriving together can never print
+    an order twice.</p>
+  <figure>
+    <div class="plate narrow"><pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    [*] --> awaiting_payment: order placed
+    [*] --> queued: free / print-first cash
+    awaiting_payment --> queued: paid + auto-print on
+    awaiting_payment --> waiting_approval: paid + auto-print off
+    awaiting_payment --> expired: unpaid 30 min
+    awaiting_payment --> cancelled: shopkeeper
+    waiting_approval --> queued: shopkeeper taps Print now
+    queued --> printing: print worker picks it
+    printing --> printed: all files sent
+    printing --> failed: printer error / PC restarted
+    failed --> queued: Retry (only failed files)
+    printed --> queued: Reprint
+    printed --> [*]
+    expired --> [*]
+    cancelled --> [*]
+    </pre></div>
+    <figcaption>The customer's phone shows the same states as four dots: Payment → In queue → Printing → Ready.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>State</th><th>Customer sees</th><th>Shopkeeper sees</th></tr></thead>
+    <tbody>
+      <tr><td class="num">awaiting_payment</td><td>Pay box (Razorpay / UPI QR / counter)</td><td>Orange edge if cash or "customer says paid"; Paid ✓ button</td></tr>
+      <tr><td class="num">waiting_approval</td><td>"Paid - the shopkeeper will start your print"</td><td>Orange edge; Print now button</td></tr>
+      <tr><td class="num">queued / printing</td><td>Progress bar, page X of Y</td><td>Live page count</td></tr>
+      <tr><td class="num">printed</td><td>"Printed - collect it at the counter"</td><td>Reprint; Cash received if unpaid</td></tr>
+      <tr><td class="num">failed</td><td>"Print problem - shopkeeper alerted"</td><td>Red edge, the printer's error, Retry</td></tr>
+      <tr><td class="num">expired / cancelled</td><td>Order closed</td><td>Grey; files deleted later</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 5. PRINT -->
+<section id="print">
+  <div class="eyebrow">05 · Paper</div>
+  <h2>Print pipeline</h2>
+  <figure>
+    <div class="plate">
+      <svg viewBox="0 0 1080 200" role="img" aria-label="Uploaded file is checked, converted to PDF if it is Word or text, page range selected, each page rendered one at a time, printer settings applied, sent through the Windows spooler to the printer.">
+        <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect class="box" x="10" y="50" width="140" height="80"/>
+        <text class="t" x="80" y="80" text-anchor="middle">Upload</text>
+        <text class="s" x="80" y="100" text-anchor="middle">≤ 50 MB · type check</text>
+        <text class="s" x="80" y="116" text-anchor="middle">opens? page count</text>
+        <rect class="box" x="190" y="50" width="140" height="80"/>
+        <text class="t" x="260" y="80" text-anchor="middle">Convert</text>
+        <text class="s" x="260" y="100" text-anchor="middle">Word → PDF (Word /</text>
+        <text class="s" x="260" y="116" text-anchor="middle">LibreOffice) · TXT → PDF</text>
+        <rect class="box" x="370" y="50" width="140" height="80"/>
+        <text class="t" x="440" y="80" text-anchor="middle">Select pages</text>
+        <text class="s" x="440" y="100" text-anchor="middle">"1-3, 5" × copies</text>
+        <text class="s" x="440" y="116" text-anchor="middle">orientation decided</text>
+        <rect class="box" x="550" y="50" width="160" height="80"/>
+        <text class="t" x="630" y="80" text-anchor="middle">Render 1 page</text>
+        <text class="s" x="630" y="100" text-anchor="middle">≤ 300 dpi · grey for B&amp;W</text>
+        <text class="s" x="630" y="116" text-anchor="middle">rotate · fit to page</text>
+        <rect class="box" x="750" y="50" width="150" height="80"/>
+        <text class="t" x="825" y="80" text-anchor="middle">Printer settings</text>
+        <text class="s" x="825" y="100" text-anchor="middle">colour · 2-sided</text>
+        <text class="s" x="825" y="116" text-anchor="middle">paper · orientation</text>
+        <rect class="box" x="940" y="50" width="130" height="80"/>
+        <text class="t" x="1005" y="80" text-anchor="middle">Spooler</text>
+        <text class="s" x="1005" y="100" text-anchor="middle">→ printer</text>
+        <text class="s" x="1005" y="116" text-anchor="middle">job "Token 105"</text>
+        <path class="w" d="M150,90 H190" marker-end="url(#b)"/>
+        <path class="w" d="M330,90 H370" marker-end="url(#b)"/>
+        <path class="w" d="M510,90 H550" marker-end="url(#b)"/>
+        <path class="w" d="M900,90 H940" marker-end="url(#b)"/>
+        <path class="w" d="M710,90 H750" marker-end="url(#b)"/>
+        <path class="w" d="M630,130 V165 H580 V140" marker-end="url(#b)"/>
+        <text class="l" x="640" y="178">repeat for every page and copy</text>
+        <text class="l" x="260" y="36" text-anchor="middle">once, at upload</text>
+        <text class="l" x="825" y="36" text-anchor="middle">once per file</text>
+      </svg>
+    </div>
+    <figcaption>Pages are drawn one at a time, so a 300-page PDF never sits in memory. On 2-sided jobs each copy starts on a fresh sheet. "Microsoft Print to PDF" saves into Documents\QR Print Shop instead of asking where to save.</figcaption>
+  </figure>
+</section>
+
+<!-- 6. CONNECTIONS -->
+<section id="connections">
+  <div class="eyebrow">06 · Reference</div>
+  <h2>Every connection</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>From → To</th><th>Address</th><th>Carries</th><th>Who starts it</th></tr></thead>
+    <tbody>
+      <tr><td>Phone → shop PC</td><td class="num">GET /</td><td>Customer page</td><td>Customer scans</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">GET /api/shop</td><td>Name, prices, printer can do colour / 2-sided, pay options</td><td>Page load</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">POST /api/uploads</td><td>One file; returns page count</td><td>Each file chosen</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">GET /api/uploads/{id}/preview.png</td><td>Thumbnail of page 1</td><td>After upload</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">POST /api/quote</td><td>Price worked out on the PC</td><td>Review step</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">POST /api/orders</td><td>Creates order, token, private access key</td><td>Pay button</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">GET /api/orders/{id}?k=…</td><td>Live status</td><td>Every 2.5 s</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">POST /api/orders/{id}/razorpay</td><td>Payment id + signature</td><td>After checkout</td></tr>
+      <tr><td>Phone → shop PC</td><td class="num">POST /api/orders/{id}/claim-paid</td><td>"I have paid" + UTR (does not print)</td><td>UPI customer</td></tr>
+      <tr><td><span class="tag pay">PC → Razorpay</span></td><td class="num">api.razorpay.com/v1/orders</td><td>Create order, list payments</td><td>Order placed; every 20 s while unpaid</td></tr>
+      <tr><td><span class="tag net">PC → Registry</span></td><td class="num">POST /api/registry/heartbeat</td><td>Shop ID, tunnel address, secret</td><td>Every 60 s</td></tr>
+      <tr><td><span class="tag net">PC → DNS</span></td><td class="num">cloudflare-dns.com · dns.google</td><td>Is the new tunnel name live?</td><td>New tunnel only</td></tr>
+      <tr><td><span class="tag net">cloudflared → Cloudflare</span></td><td class="num">outbound HTTPS</td><td>Tunnel (no router port opening needed)</td><td>App start; auto-restart</td></tr>
+      <tr><td>Phone → Registry</td><td class="num">GET /s/{shop-id}</td><td>307 to current tunnel, or offline page</td><td>Poster scan</td></tr>
+      <tr><td>Dashboard → PC</td><td class="num">/api/admin/*</td><td>Login, orders, Paid ✓, Print, settings, reports</td><td>Shopkeeper; orders refresh every 2 s</td></tr>
+      <tr><td>PC → Printer</td><td class="num">Windows GDI → spooler</td><td>Rendered pages + settings</td><td>Print worker</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 7. TIMERS -->
+<section id="timers">
+  <div class="eyebrow">07 · Reference</div>
+  <h2>Timers and limits</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>What</th><th>Value</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Heartbeat to registry</td><td class="num">60 s</td><td>Keeps the permanent QR pointing at the PC</td></tr>
+      <tr><td>Registry marks shop offline</td><td class="num">3 min</td><td>No dead links after the PC switches off</td></tr>
+      <tr><td>Tunnel restart backoff</td><td class="num">15 s → 5 min</td><td>Never flood Cloudflare (it answers 429)</td></tr>
+      <tr><td>Razorpay re-check</td><td class="num">20 s</td><td>Catches payments where the page was closed</td></tr>
+      <tr><td>Unpaid order expires</td><td class="num">30 min</td><td>Shop setting</td></tr>
+      <tr><td>Customer files deleted</td><td class="num">60 min</td><td>After printed / cancelled / expired; shop setting</td></tr>
+      <tr><td>Upload not ordered</td><td class="num">3 h</td><td>Abandoned uploads removed</td></tr>
+      <tr><td>File size · files · copies</td><td class="num">50 MB · 15 · 50</td><td>Per file · per order · per file</td></tr>
+      <tr><td>PDF pages</td><td class="num">500</td><td>Larger jobs go to the counter</td></tr>
+      <tr><td>Wrong PIN</td><td class="num">6 tries / 5 min</td><td>Then locked for 5 minutes</td></tr>
+      <tr><td>Admin login lasts</td><td class="num">12 h</td><td>Also ends on PIN change or app restart</td></tr>
+      <tr><td>Uploads · orders per phone</td><td class="num">80 · 20 / 10 min</td><td>Stops spam</td></tr>
+      <tr><td>Token numbers</td><td class="num">#101 daily</td><td>Reset every morning</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 8. SECURITY -->
+<section id="security">
+  <div class="eyebrow">08 · Trust</div>
+  <h2>Security layers</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Threat</th><th>What stops it</th></tr></thead>
+    <tbody>
+      <tr><td>Printing without paying</td><td>Razorpay signature + API check, or shopkeeper's Paid ✓. The "I have paid" button never prints.</td></tr>
+      <tr><td>Changing prices or the UPI ID</td><td>Dashboard needs the PIN (stored hashed, PBKDF2). First PIN can only be set on the shop PC itself, never through the tunnel.</td></tr>
+      <tr><td>A website tricking the shopkeeper's browser</td><td>Admin actions need a custom header and a same-site cookie.</td></tr>
+      <tr><td>Seeing someone else's order</td><td>Every order has a private random key in the customer's link.</td></tr>
+      <tr><td>Hijacking a shop's QR</td><td>Registry locks each shop ID to that shop's secret; https targets only.</td></tr>
+      <tr><td>Malicious file names</td><td>All names shown as text, never as HTML; unsupported or damaged files refused.</td></tr>
+      <tr><td>Wrong price from the phone</td><td>Price always recalculated on the PC from the shop's own rates.</td></tr>
+      <tr><td>Double print after a crash</td><td>Interrupted jobs marked failed; the shopkeeper decides to Retry.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 9. DATA -->
+<section id="data">
+  <div class="eyebrow">09 · Storage</div>
+  <h2>Where data lives</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th>Place</th><th>Kept</th></tr></thead>
+    <tbody>
+      <tr><td>Settings (prices, printer, UPI, keys, PIN hash)</td><td class="num">%LOCALAPPDATA%\QRPrintShop\settings.json</td><td>Until changed</td></tr>
+      <tr><td>Orders, tokens, report data</td><td class="num">…\QRPrintShop\qrprint.db</td><td>Permanent (for reports)</td></tr>
+      <tr><td>Customer files</td><td class="num">…\QRPrintShop\files\</td><td>Deleted 60 min after finishing</td></tr>
+      <tr><td>Logo · log</td><td class="num">…\logo.png · qrprint.log</td><td>Log rotates at 2 MB</td></tr>
+      <tr><td>Registry entries</td><td class="num">Vercel + Upstash Redis</td><td>Shop ID, address, secret hash</td></tr>
+      <tr><td>Card / UPI details</td><td class="num">Razorpay only</td><td>Never touch the shop PC</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><b>Daily check for the shopkeeper:</b> PC and printer on, dashboard open, top bar shows the printer as
+    Ready and "Mobile data (4G/5G): Working". Anything else appears as a coloured alert bar with what to do.</div>
+</section>
+
+<section>
+  <div class="eyebrow">10 · One order, start to finish</div>
+  <h2>A customer on 4G, in plain steps</h2>
+  <ol class="steps">
+    <li><span>Scans the poster. Phone opens the permanent link; registry forwards to the shop's current tunnel.</span></li>
+    <li><span>Uploads two files. The PC checks each opens, counts pages, shows a preview.</span></li>
+    <li><span>Chooses colour, 2 copies, pages 1-3. Price shows live; the PC recalculates it on Review.</span></li>
+    <li><span>Taps Pay ₹80 online. Gets token <b>#105</b>. Razorpay checkout opens; pays by UPI.</span></li>
+    <li><span>PC verifies the signature, queues the order. Dashboard updates; no tap needed.</span></li>
+    <li><span>Print worker renders each page, applies colour and paper settings, sends "Token 105" to the printer.</span></li>
+    <li><span>Phone shows Ready. Customer says "105" at the counter and collects.</span></li>
+    <li><span>An hour later the files are deleted from the PC. The order stays in the daily report.</span></li>
+  </ol>
+</section>
+
+</div>
