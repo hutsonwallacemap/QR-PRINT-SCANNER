@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from typing import Callable, Optional
 
-logger = logging.getLogger("qr_print.tunnel")
+logger = logging.getLogger("qrprint.tunnel")
 
 TUNNEL_URL_RE = re.compile(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com")
 

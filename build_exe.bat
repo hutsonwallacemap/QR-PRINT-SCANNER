@@ -1,19 +1,12 @@
 @echo off
 cd /d "%~dp0"
-echo Installing PyInstaller and building standalone QRPrintSystem.exe...
-.\.venv\Scripts\pip.exe install pyinstaller
-.\.venv\Scripts\pyinstaller.exe --noconfirm --onefile --name "QRPrintSystem" ^
+echo Building dist\QRPrintShop.exe ...
+".venv\Scripts\python.exe" -m pip install --quiet pyinstaller
+".venv\Scripts\pyinstaller.exe" --noconfirm --onefile --windowed --name "QRPrintShop" ^
   --add-data "static;static" ^
-  --hidden-import "win32timezone" ^
-  --hidden-import "uvicorn.logging" ^
-  --hidden-import "uvicorn.loops" ^
-  --hidden-import "uvicorn.loops.auto" ^
-  --hidden-import "uvicorn.protocols" ^
-  --hidden-import "uvicorn.protocols.http" ^
-  --hidden-import "uvicorn.protocols.http.auto" ^
-  --hidden-import "uvicorn.lifespan" ^
-  --hidden-import "uvicorn.lifespan.on" ^
-  app.py
+  --hidden-import win32timezone ^
+  --collect-submodules uvicorn ^
+  run.py
 echo.
-echo Build complete! Share dist\QRPrintSystem.exe with any shopkeeper.
+echo Done: dist\QRPrintShop.exe  - copy this single file to any shop PC and double-click it.
 pause
