@@ -43,7 +43,8 @@ class Razorpay:
             headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=12) as resp:
+            from .net import urlopen
+            with urlopen(req, timeout=12) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as exc:
             try:

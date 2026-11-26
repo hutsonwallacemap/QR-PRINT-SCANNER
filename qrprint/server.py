@@ -649,7 +649,7 @@ OFFLINE_HTML = """<!doctype html><html><head><meta name="viewport" content="widt
 This page retries by itself.</p></div></body></html>"""
 
 
-def dns_ready(url: str, timeout: float = 90) -> bool:
+def dns_ready(url: str, timeout: float = 45) -> bool:
     """Wait until public DNS (Cloudflare + Google) knows the new tunnel name.
 
     If customers were sent there before the name exists, their mobile
@@ -667,7 +667,8 @@ def dns_ready(url: str, timeout: float = 90) -> bool:
         for r in resolvers:
             try:
                 req = urllib.request.Request(r.format(host), headers={"accept": "application/dns-json"})
-                with urllib.request.urlopen(req, timeout=6) as resp:
+                from .net import urlopen
+                with urlopen(req, timeout=6) as resp:
                     if json.loads(resp.read().decode()).get("Answer"):
                         ok += 1
             except Exception:
@@ -688,10 +689,13 @@ def sync_registry(ctx: Ctx) -> None:
         return
     with _sync_lock:
         if getattr(ctx, "dns_checked_url", None) != url:
-            ctx.registry_status = "" if ctx.registry_status != "ok" else ctx.registry_status
+            # Give public DNS a short head start so phones don't cache "not found".
+            # This must never block the shop: if the DNS services can't be reached
+            # from this network (blocked, no answer), send the address anyway.
+            if ctx.registry_status != "ok":
+                ctx.registry_status = ""
             if not dns_ready(url):
-                logger.warning("Tunnel name %s not in public DNS yet; will retry", url)
-                return
+                logger.warning("Could not confirm %s in public DNS within 45 s; updating the QR anyway", url)
             ctx.dns_checked_url = url
         from .registry import send_heartbeat
         err = send_heartbeat(s.registry_url, s.shop_id, url, s.registry_secret, s.shop_name)

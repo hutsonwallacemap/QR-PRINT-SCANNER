@@ -5,3 +5,4 @@ qrcode[pil]>=7.4
 pillow>=10.4
 pymupdf>=1.24
 pywin32>=306; sys_platform == "win32"
+certifi>=2024.2

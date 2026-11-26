@@ -370,3 +370,24 @@ def test_tunnel_url_pattern_ignores_cloudflare_errors():
     assert not TUNNEL_URL_RE.search('failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel"')
     m = TUNNEL_URL_RE.search("|  https://saying-webmasters-defining-automobiles.trycloudflare.com  |")
     assert m and m.group(0) == "https://saying-webmasters-defining-automobiles.trycloudflare.com"
+
+
+def test_permanent_qr_updates_even_if_dns_check_is_blocked(env, monkeypatch):
+    """Epson laptop bug: DNS-over-HTTPS blocked -> QR stayed 'Registering...' forever."""
+    from qrprint import registry, server
+    ctx, s = env["ctx"], env["settings"]
+    s.update(registry_url="https://reg.example", shop_id="shop-03354c", enable_tunnel=True)
+    ctx.tunnel_allowed = True
+    ctx.tunnel.public_url = "https://a-b-c.trycloudflare.com"
+    sent = []
+    monkeypatch.setattr(server, "dns_ready", lambda url, timeout=45: False)  # DNS services unreachable
+    monkeypatch.setattr(registry, "send_heartbeat", lambda *a, **k: sent.append(a) or "")
+    server.sync_registry(ctx)
+    assert sent and sent[0][2] == "https://a-b-c.trycloudflare.com"
+    assert ctx.registry_status == "ok"
+    assert ctx.mobile_status()["text"].startswith("Not working") is False
+
+
+def test_https_helper_trusts_bundled_certificates():
+    from qrprint.net import ssl_context
+    assert ssl_context().cert_store_stats()["x509_ca"] > 100

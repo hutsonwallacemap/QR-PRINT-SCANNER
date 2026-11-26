@@ -110,8 +110,9 @@ def send_heartbeat(registry_url: str, shop_id: str, target_url: str, secret: str
                        "shop_name": shop_name}).encode()
     req = urllib.request.Request(f"{registry_url.rstrip('/')}/api/registry/heartbeat", method="POST",
                                  data=body, headers={"Content-Type": "application/json"})
+    from .net import urlopen
     try:
-        with urllib.request.urlopen(req, timeout=8) as r:
+        with urlopen(req, timeout=10) as r:
             return "" if r.status == 200 else f"HTTP {r.status}"
     except urllib.error.HTTPError as exc:  # type: ignore[attr-defined]
         try:
