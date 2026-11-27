@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Poster</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", Roboto, sans-serif; background: #e5e7eb; color: #0f172a; }
+  .sheet { width: 210mm; min-height: 297mm; margin: 12px auto; background: #fff; padding: 18mm 16mm; text-align: center;
+    display: flex; flex-direction: column; align-items: center; }
+  .logo { max-height: 26mm; max-width: 70mm; margin-bottom: 4mm; }
+  h1 { font-size: 30pt; margin: 0; }
+  .addr { color: #475569; font-size: 13pt; margin-top: 2mm; }
+  .head { font-size: 40pt; font-weight: 900; margin: 10mm 0 2mm; color: #2563eb; letter-spacing: -1px; }
+  .lead { font-size: 15pt; color: #334155; }
+  .qr { margin: 9mm 0 6mm; padding: 6mm; border: 3px solid #0f172a; border-radius: 8mm; }
+  .qr img { width: 100mm; height: 100mm; display: block; }
+  .steps { display: flex; gap: 6mm; margin-top: 4mm; }
+  .step { flex: 1; border: 1.5px solid #cbd5e1; border-radius: 5mm; padding: 4mm; font-size: 12pt; }
+  .step b { display: block; font-size: 22pt; color: #2563eb; }
+  .prices { margin-top: 7mm; font-size: 14pt; font-weight: 700; }
+  .foot { margin-top: auto; font-size: 10pt; color: #64748b; }
+  .warn { font-size: 10pt; color: #b45309; margin-top: 3mm; }
+  .bar { position: fixed; top: 10px; right: 10px; }
+  .bar button { font: 600 15px system-ui; padding: 10px 18px; border-radius: 10px; border: 0; background: #2563eb; color: #fff; cursor: pointer; }
+  @media print { body { background: #fff; } .sheet { margin: 0; } .bar { display: none; } }
+</style>
+</head>
+<body>
+<div class="bar"><button onclick="print()">Print poster</button></div>
+<div class="sheet">
+  <img id="logo" class="logo" alt="" hidden>
+  <h1 id="name">Print Shop</h1>
+  <div class="addr" id="addr"></div>
+  <div class="head">Scan &amp; Print</div>
+  <div class="lead">No queue, no pen drive, no WhatsApp. Print from your phone.</div>
+  <div class="qr"><img src="/api/qr.png" alt="QR code"></div>
+  <div class="steps">
+    <div class="step"><b>1</b>Scan the QR with your phone camera</div>
+    <div class="step"><b>2</b>Choose files, colour &amp; copies</div>
+    <div class="step"><b>3</b>Pay &amp; collect your prints with your token</div>
+  </div>
+  <div class="prices" id="prices"></div>
+  <div class="warn" id="wifi" hidden>Connect to the shop Wi-Fi before scanning.</div>
+  <div class="lead" id="anynet" hidden style="font-size:12pt;margin-top:3mm">Works on mobile data or Wi-Fi.</div>
+  <div class="foot">Your files are deleted automatically after printing.</div>
+</div>
+<script>
+fetch("/api/shop").then(r => r.json()).then(s => {
+  document.getElementById("name").textContent = s.name;
+  document.getElementById("addr").textContent = [s.address, s.phone].filter(Boolean).join(" · ");
+  const p = s.prices;
+  document.getElementById("prices").textContent =
+    `B&W ₹${p.bw} / page` + (s.caps.color ? `   ·   Colour ₹${p.color} / page` : "");
+  if (s.has_logo) { const l = document.getElementById("logo"); l.src = "/api/logo"; l.hidden = false; }
+});
+fetch("/api/admin/state", { credentials: "same-origin" }).then(r => r.ok ? r.json() : null).then(st => {
+  if (!st) return;
+  document.getElementById(st.customer_url.startsWith("http://") ? "wifi" : "anynet").hidden = false;
+}).catch(() => {});
+</script>
+</body>
+</html>

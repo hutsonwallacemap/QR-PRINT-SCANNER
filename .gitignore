@@ -1,9 +1,12 @@
 .venv/
 __pycache__/
 *.pyc
-uploads/
-branding/
-.env
+.devdata/
+.pytest_cache/
 dist/
 build/
 *.spec
+.claude/settings.local.json
+qr_registry.json
+bin/
+*.zip

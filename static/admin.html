@@ -1,505 +1,216 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Print — Shop Dashboard</title>
-  <style>
-    :root {
-      --bg: #0f172a; --card: #1e293b; --border: #334155;
-      --text: #f8fafc; --muted: #94a3b8; --primary: #3b82f6;
-      --success: #22c55e; --warn: #f59e0b; --danger: #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg); color: var(--text); padding: 20px;
-    }
-    .wrap { max-width: 1140px; margin: 0 auto; }
-    .topbar {
-      display: flex; justify-content: space-between; align-items: center;
-      flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
-    }
-    .topbar h1 { font-size: 1.5rem; }
-    .topbar-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
-    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
-    .btn {
-      display: inline-block; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
-      background: #0f172a; color: var(--text); font-weight: 600; cursor: pointer;
-      text-decoration: none; font-size: 0.88rem;
-    }
-    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-    .btn-success { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #86efac; }
-    .btn-danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #fca5a5; }
-
-    /* QR Section */
-    .qr-box { text-align: center; }
-    .qr-box img { width: 240px; height: 240px; border-radius: 14px; background: #fff; padding: 10px; }
-    .network-badge {
-      margin-top: 10px; padding: 6px 14px; border-radius: 999px; display: inline-block;
-      font-size: 0.82rem; font-weight: 700;
-    }
-    .network-badge.public { background: rgba(34,197,94,0.15); color: #86efac; }
-    .network-badge.starting { background: rgba(245,158,11,0.15); color: #fcd34d; }
-    .network-badge.local { background: rgba(59,130,246,0.15); color: #93c5fd; }
-    .url-box {
-      margin-top: 10px; padding: 8px 12px; background: #0f172a; border: 1px solid var(--border);
-      border-radius: 8px; font-family: monospace; font-size: 0.85rem; word-break: break-all;
-    }
-    .qr-hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; line-height: 1.4; }
-
-    /* Settings */
-    .field { margin-top: 14px; }
-    .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
-    select, input[type="text"] {
-      width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
-      background: #0f172a; color: var(--text); font-size: 0.9rem;
-    }
-    .toggle-row {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 14px; padding: 12px; background: #0f172a; border: 1px solid var(--border); border-radius: 10px;
-    }
-    .toggle-label strong { font-size: 0.92rem; }
-    .toggle-label small { display: block; font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
-
-    /* Toggle switch */
-    .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; cursor: pointer; inset: 0; background: #475569;
-      border-radius: 26px; transition: 0.3s;
-    }
-    .slider::before {
-      content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px;
-      background: white; border-radius: 50%; transition: 0.3s;
-    }
-    .switch input:checked + .slider { background: var(--success); }
-    .switch input:checked + .slider::before { transform: translateX(22px); }
-
-    /* Job table */
-    .job-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    .job-table th, .job-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
-    .job-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
-    .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-    }
-    .badge.queued, .badge.printing { background: rgba(245,158,11,0.2); color: #fcd34d; }
-    .badge.printed { background: rgba(34,197,94,0.2); color: #86efac; }
-    .badge.failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
-    .badge.waiting_approval, .badge.awaiting_payment { background: rgba(59,130,246,0.2); color: #93c5fd; }
-    .badge.payment_confirming { background: rgba(245,158,11,0.25); color: #fde047; }
-    .job-msg { font-size: 0.76rem; color: var(--muted); margin-top: 3px; }
-    .empty-state { text-align: center; padding: 32px; color: var(--muted); }
-    .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; }
-
-    /* Stats bar */
-    .stats-bar { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-    .stat-pill {
-      padding: 6px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
-      background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); color: #93c5fd;
-    }
-    .stat-pill.active { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #86efac; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Print Shop · Dashboard</title>
+<link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
-  <div class="wrap">
-    <div class="topbar">
-      <h1>🖨️ QR Print — Shop Dashboard</h1>
-      <div class="topbar-btns">
-        <a href="/api/report/csv" class="btn btn-success">📊 Download CSV Report</a>
-        <a href="/" target="_blank" class="btn">📱 Customer Page</a>
-        <a href="/qr-poster" target="_blank" class="btn btn-primary">🖨️ Print QR Poster</a>
-      </div>
-    </div>
+<body class="admin">
 
-    <div class="grid">
-      <!-- Left Panel -->
-      <div>
-        <div class="card">
-          <div class="qr-box">
-            <img id="qrImg" src="/api/qr" alt="QR Code" />
-            <div>
-              <span class="network-badge local" id="networkBadge">Checking...</span>
-            </div>
-            <div class="url-box" id="qrUrl">Loading...</div>
-            <div class="qr-hint">Customers scan this QR code from phone camera.<br/>Works on 4G/5G mobile data or any Wi-Fi.</div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:16px;">
-          <div class="field" style="margin-top:0;">
-            <label>Permanent Shop ID (for fixed QR sticker)</label>
-            <div style="display:flex; gap:6px;">
-              <input type="text" id="shopId" placeholder="e.g. ravi-xerox" />
-              <button class="btn btn-primary" onclick="saveShopId()">Save</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Shop Name &amp; Phone (shown on Poster)</label>
-            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px;">
-              <input type="text" id="shopName" placeholder="Shop Name" />
-              <input type="text" id="shopPhone" placeholder="Phone (optional)" />
-              <button class="btn btn-primary" onclick="saveShopInfo()">Save</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Shop UPI ID (for Customer UPI Pay QR)</label>
-            <div style="display:flex; gap:6px;">
-              <input type="text" id="upiId" placeholder="e.g. shopname@okicici" />
-              <button class="btn btn-primary" onclick="saveUpi()">Save</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Shop Logo (for QR Poster)</label>
-            <div style="display:flex; gap:6px; align-items:center;">
-              <input type="file" id="logoFile" accept="image/*" style="font-size:0.8rem;" />
-              <button class="btn" onclick="uploadLogo()">Upload</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Active Windows Printer</label>
-            <div style="display:flex; gap:6px;">
-              <select id="printerSelect"></select>
-              <button class="btn" onclick="loadPrinters()">↻</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Pricing (₹ per page)</label>
-            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:6px; align-items:center;">
-              <input type="text" id="priceBw" placeholder="B&W ₹" title="B&W ₹/page" />
-              <input type="text" id="priceColor" placeholder="Color ₹" title="Color ₹/page" />
-              <button class="btn btn-primary" onclick="savePrices()">Save</button>
-            </div>
-          </div>
-
-          <div class="toggle-row">
-            <div class="toggle-label">
-              <strong>Auto-Accept &amp; Print</strong>
-              <small>Print uploads immediately without approval</small>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="autoPrintToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="toggle-row">
-            <div class="toggle-label">
-              <strong>Verify UPI Payment Before Print</strong>
-              <small>OFF = auto-print after customer pays (no gateway needed)</small>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="verifyPayToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="toggle-row">
-            <div class="toggle-label">
-              <strong>Start with Windows</strong>
-              <small>Auto-launch silently when PC turns on</small>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="autostartToggle" />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="field">
-            <label>Custom Public URL (optional — auto-detected if tunnel is running)</label>
-            <div style="display:flex; gap:6px;">
-              <input type="text" id="customUrl" placeholder="https://your-shop.trycloudflare.com" />
-              <button class="btn btn-primary" onclick="saveCustomUrl()">Save</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Panel - Queue -->
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <h2 style="font-size:1.15rem;">Live Print Queue</h2>
-          <span style="color:var(--muted); font-size:0.78rem;">Auto-refreshing</span>
-        </div>
-        <div class="stats-bar" id="statsBar"></div>
-        <div style="overflow-x:auto;">
-          <table class="job-table">
-            <thead>
-              <tr><th>Customer</th><th>File</th><th>Options</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="jobsBody">
-              <tr><td colspan="5" class="empty-state"><div class="icon">📭</div>No print jobs yet.<br/>Waiting for customers to scan the QR code...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+<!-- login / first-time setup -->
+<div id="authView" class="login" hidden>
+  <div class="card">
+    <div class="big-ico">🖨️</div>
+    <h2 id="authTitle">Shop login</h2>
+    <p class="muted small" id="authHelp">Enter your shop PIN.</p>
+    <form id="authForm">
+      <input id="pin" class="pinput" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" required>
+      <input id="pin2" class="pinput" type="password" inputmode="numeric" placeholder="repeat" maxlength="12" hidden style="margin-top:10px">
+      <div class="err" id="authErr" hidden></div>
+      <button class="btn primary block" style="margin-top:14px" id="authBtn">Log in</button>
+    </form>
   </div>
+</div>
 
-  <!-- Notification sound (short beep via Web Audio API) -->
-  <script>
-    let audioCtx;
-    function playNotificationBeep() {
-      try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.3);
-      } catch {}
-    }
+<div id="app" hidden>
+  <div class="topbar">
+    <div>
+      <div class="shopname" id="tShop">Print Shop</div>
+      <div class="sub" id="tPrinter">—</div>
+    </div>
+    <div class="spacer"></div>
+    <label class="toggle" title="When off, customers see 'not taking orders'"><input type="checkbox" id="tAccepting"><span class="sw"></span>Taking orders</label>
+    <label class="toggle" title="Print automatically once paid"><input type="checkbox" id="tAuto"><span class="sw"></span>Auto-print</label>
+    <label class="toggle" title="Let customers choose 2-sided. Details in Printer &amp; prices."><input type="checkbox" id="tDuplex"><span class="sw"></span>2-sided</label>
+    <button class="btn sm" id="soundBtn" title="New-order sound">🔔 Sound on</button>
+    <button class="btn sm" id="logout">Log out</button>
+  </div>
+  <div class="alertbar" id="alertBar" hidden></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="orders" class="on">Orders <span class="badge" id="attnBadge" hidden>0</span></button>
+    <button data-tab="setup">Printer &amp; prices</button>
+    <button data-tab="payments">Payments</button>
+    <button data-tab="qr">QR code &amp; poster</button>
+    <button data-tab="reports">Reports</button>
+    <button data-tab="security">Security</button>
+  </nav>
 
-    let lastQrUrl = "";
-    let infoTimer;
+  <!-- ORDERS -->
+  <section class="page tab" id="tab-orders">
+    <div class="stats" id="stats"></div>
+    <div class="orders" id="orders"></div>
+  </section>
 
-    async function loadInfo() {
-      try {
-        const res = await fetch("/api/info");
-        const data = await res.json();
-        document.getElementById("qrUrl").textContent = data.qr_url;
-        document.getElementById("autoPrintToggle").checked = data.auto_print;
-        document.getElementById("verifyPayToggle").checked = Boolean(data.require_payment_verify);
-        document.getElementById("customUrl").value = data.custom_base_url || "";
-        document.getElementById("shopId").value = data.shop_id || "";
-        document.getElementById("shopName").value = data.shop_name || "";
-        document.getElementById("shopPhone").value = data.shop_phone || "";
-        document.getElementById("upiId").value = data.upi_id || "";
-        document.getElementById("priceBw").value = data.price_bw ?? 2;
-        document.getElementById("priceColor").value = data.price_color ?? 10;
+  <!-- SETUP -->
+  <section class="page tab" id="tab-setup" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h3 class="card-title">Printer</h3>
+        <p class="muted small">Customers' files go to this printer.</p>
+        <div id="printers"></div>
+        <button class="btn outline block" id="testPrint">Print a test page</button>
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <div class="field form"><div class="label">Colour jobs print on</div>
+          <select id="printer_color"></select>
+          <div class="hint">Have a B&amp;W laser and a colour inkjet? Pick the colour one here; B&amp;W jobs stay on the printer ticked above.</div></div>
+        <div class="field form"><div class="label">2-sided printing</div>
+          <select id="duplex_mode">
+            <option value="auto">Automatic (recommended)</option>
+            <option value="manual">Always turn pages by hand</option>
+            <option value="off">Off (1-sided only)</option>
+          </select>
+          <div class="hint" id="duplexInfo"></div></div>
+        <label class="toggle"><input type="checkbox" id="manual_duplex_reverse"><span class="sw"></span>Hand-turned backs come out in the wrong order</label>
+        <p class="muted small" style="margin:6px 0 0">Test once with a 4-page document. Turn this on only if page 2 ends up behind page 3.</p>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">Prices (₹ per printed side)</h3>
+        <div class="row2">
+          <div class="field"><div class="label">Black &amp; white</div><input type="number" step="0.5" min="0" id="price_bw"></div>
+          <div class="field"><div class="label">Colour</div><input type="number" step="0.5" min="0" id="price_color"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><div class="label">B&amp;W 2-sided</div><input type="number" step="0.5" min="0" id="price_bw_duplex" placeholder="same">
+            <div class="hint">per side · blank = same</div></div>
+          <div class="field"><div class="label">Colour 2-sided</div><input type="number" step="0.5" min="0" id="price_color_duplex" placeholder="same"></div>
+        </div>
+        <div class="field"><div class="label">Minimum order (₹)</div><input type="number" step="1" min="0" id="min_order_amount"></div>
+        <div class="field"><div class="label">Paper sizes you stock</div><div class="checks" id="papers"></div></div>
+        <button class="btn primary block" data-save="price_bw,price_color,price_bw_duplex,price_color_duplex,min_order_amount,allowed_paper_sizes">Save prices</button>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">Shop details</h3>
+        <div class="field"><div class="label">Shop name</div><input id="shop_name" maxlength="60"></div>
+        <div class="field"><div class="label">Area / address (shown to customers)</div><input id="shop_address" maxlength="80"></div>
+        <div class="field"><div class="label">Phone</div><input id="shop_phone" maxlength="20"></div>
+        <div class="field"><div class="label">Logo</div>
+          <div class="btnrow"><input type="file" id="logoFile" accept="image/*"><button class="btn sm bad" id="logoDel">Remove</button></div></div>
+        <button class="btn primary block" data-save="shop_name,shop_address,shop_phone">Save details</button>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">Privacy &amp; start-up</h3>
+        <div class="field"><div class="label">Delete customer files after (minutes)</div><input type="number" min="5" id="file_retention_minutes">
+          <div class="hint">Files are deleted automatically after printing. Customers trust shops that do this.</div></div>
+        <button class="btn primary block" data-save="file_retention_minutes">Save</button>
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <label class="toggle"><input type="checkbox" id="autostart"><span class="sw"></span>Start automatically when this PC turns on</label>
+      </div>
+    </div>
+  </section>
 
-        const badge = document.getElementById("networkBadge");
-        badge.className = "network-badge";
-        if (data.is_permanent_qr) {
-          badge.textContent = "🔗 Permanent QR Sticker Active (4G/5G + Wi-Fi)";
-          badge.classList.add("public");
-        } else if (data.is_public) {
-          badge.textContent = "🌐 Public Mode — 4G/5G + Wi-Fi";
-          badge.classList.add("public");
-        } else if (data.tunnel_status === "starting") {
-          badge.textContent = "⏳ Starting Public Tunnel...";
-          badge.classList.add("starting");
-        } else {
-          badge.textContent = "📶 Local Wi-Fi Only";
-          badge.classList.add("local");
-        }
+  <!-- PAYMENTS -->
+  <section class="page tab" id="tab-payments" hidden>
+    <div class="grid2">
+      <div class="card form">
+        <h3 class="card-title">⚡ Automatic: Razorpay <span class="pill printed" id="rzpPill" hidden>active</span></h3>
+        <p class="muted small">Customer pays by UPI / card inside the page, the payment is verified with Razorpay, and
+          the print starts by itself. Nobody can print without paying. Razorpay charges about 2% per payment.</p>
+        <div class="field"><div class="label">Key ID</div><input id="razorpay_key_id" placeholder="rzp_live_..." autocomplete="off"></div>
+        <div class="field"><div class="label">Key Secret</div><input id="razorpay_key_secret" type="password" autocomplete="new-password" placeholder="enter to change">
+          <div class="hint">Razorpay Dashboard → Account &amp; Settings → API Keys. Use rzp_test_ keys to try it first.</div></div>
+        <div class="btnrow">
+          <button class="btn primary grow" data-save="razorpay_key_id,razorpay_key_secret">Save</button>
+          <button class="btn outline" id="rzpCheck">Check keys</button>
+          <button class="btn ghost" id="rzpClear">Remove</button>
+        </div>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">UPI (free, you confirm)</h3>
+        <p class="muted small">Used when Razorpay is not set. Customer pays to your UPI ID with the exact amount and
+          token in the note. A plain UPI payment can't be checked by software, so <b>you tap "Paid ✓"</b> on the order
+          after you see the money arrive, and it prints instantly.</p>
+        <div class="field"><div class="label">UPI ID</div><input id="upi_id" placeholder="yourshop@okaxis"></div>
+        <div class="field"><div class="label">Name shown in UPI app</div><input id="upi_payee_name" placeholder="Shop name"></div>
+        <button class="btn primary block" data-save="upi_id,upi_payee_name">Save UPI</button>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">Pay at counter (cash)</h3>
+        <div class="field">
+          <select id="counter_payment">
+            <option value="confirm">Allowed — print starts when I tap "Paid ✓"</option>
+            <option value="print_first">Allowed — print immediately, collect cash after</option>
+            <option value="off">Not allowed — online payment only</option>
+          </select>
+        </div>
+        <div class="field"><div class="label">Cancel unpaid orders after (minutes)</div><input type="number" min="5" id="payment_timeout_minutes"></div>
+        <button class="btn primary block" data-save="counter_payment,payment_timeout_minutes">Save</button>
+      </div>
+    </div>
+  </section>
 
-        if (lastQrUrl && lastQrUrl !== data.qr_url) {
-          document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
-        }
-        lastQrUrl = data.qr_url;
+  <!-- QR -->
+  <section class="page tab" id="tab-qr" hidden>
+    <div class="grid2">
+      <div class="card qrbox">
+        <h3 class="card-title">Customers scan this</h3>
+        <img id="qrImg" alt="QR code">
+        <div class="url" id="custUrl"></div>
+        <div class="btnrow" style="justify-content:center">
+          <a class="btn primary" href="/poster" target="_blank">Print counter poster</a>
+          <a class="btn outline" id="openCust" target="_blank">Open customer page</a>
+        </div>
+        <p class="muted small" id="qrNote"></p>
+      </div>
+      <div class="card form">
+        <h3 class="card-title">How customers reach you</h3>
+        <div class="field"><div class="label">Mobile data (4G/5G)</div><div id="mobileStatus" class="small"></div></div>
+        <div class="field"><div class="label">Same Wi-Fi address</div><div class="url" id="lanUrl"></div>
+          <div class="hint">Works only for phones on the shop Wi-Fi. Give this PC a fixed IP in your router so it never changes.</div></div>
+        <div class="field"><div class="label">Internet link (mobile data)</div><div class="url" id="tunnelUrl"></div>
+          <div class="hint">Lets customers on 4G/5G print. Needs cloudflared installed. The free link changes after a restart,
+            so use the permanent QR below or your own domain.</div></div>
+        <label class="toggle" style="margin-bottom:14px"><input type="checkbox" id="enable_tunnel"><span class="sw"></span>Internet link (restart app to apply)</label>
+        <div class="field"><div class="label">Permanent QR: registry server</div><input id="registry_url" placeholder="https://your-registry.example.com">
+          <div class="hint">Optional. A server running this app with <code>--registry</code>. Status: <b id="regStatus">—</b></div></div>
+        <div class="field"><div class="label">Shop ID</div><input id="shop_id"></div>
+        <div class="field"><div class="label">Or your own fixed address</div><input id="public_url" placeholder="https://print.yourshop.in">
+          <div class="hint">If you run a named Cloudflare tunnel / own domain. Overrides everything above.</div></div>
+        <button class="btn primary block" data-save="enable_tunnel,registry_url,shop_id,public_url">Save</button>
+      </div>
+    </div>
+  </section>
 
-        // Keep polling info until tunnel connects
-        if (data.tunnel_status === "starting") {
-          if (!infoTimer) infoTimer = setInterval(loadInfo, 2000);
-        } else if (infoTimer) {
-          clearInterval(infoTimer);
-          infoTimer = null;
-        }
-      } catch {}
-    }
+  <!-- REPORTS -->
+  <section class="page tab" id="tab-reports" hidden>
+    <div class="card form" style="max-width:520px">
+      <h3 class="card-title">Daily report</h3>
+      <div class="field"><input type="date" id="repDay"></div>
+      <div class="stats" id="repStats"></div>
+      <a class="btn primary block" id="repCsv">Download CSV (Excel)</a>
+    </div>
+    <div class="orders" id="repOrders"></div>
+  </section>
 
-    async function loadPrinters() {
-      const res = await fetch("/api/printers");
-      const data = await res.json();
-      const sel = document.getElementById("printerSelect");
-      sel.innerHTML = data.printers.map(p => {
-        const selected = p.name === data.active_printer ? "selected" : "";
-        return `<option value="${p.name}" ${selected}>${p.name}${p.is_default ? " ★" : ""}</option>`;
-      }).join("");
-    }
+  <!-- SECURITY -->
+  <section class="page tab" id="tab-security" hidden>
+    <div class="card form" style="max-width:420px">
+      <h3 class="card-title">Change PIN</h3>
+      <div class="field"><input id="curPin" type="password" inputmode="numeric" placeholder="Current PIN"></div>
+      <div class="field"><input id="newPin" type="password" inputmode="numeric" placeholder="New PIN (4-12 digits)"></div>
+      <button class="btn primary block" id="changePin">Change PIN</button>
+      <p class="muted small">Version: <span id="verInfo"></span></p>
+    </div>
+    <div class="card form" style="max-width:420px">
+      <h3 class="card-title">Close the app</h3>
+      <p class="muted small">Stops QR Print Shop on this computer, for example before installing a new version. Customers
+        will see "shop is offline" until you start it again.</p>
+      <button class="btn bad block" id="closeApp">Close QR Print Shop</button>
+    </div>
+  </section>
+</div>
 
-    document.getElementById("printerSelect").addEventListener("change", async e => {
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active_printer: e.target.value }),
-      });
-    });
-
-    document.getElementById("autoPrintToggle").addEventListener("change", async e => {
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_print: e.target.checked }),
-      });
-    });
-
-    document.getElementById("verifyPayToggle").addEventListener("change", async e => {
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ require_payment_verify: e.target.checked }),
-      });
-    });
-
-    async function saveCustomUrl() {
-      const url = document.getElementById("customUrl").value;
-      const res = await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ custom_base_url: url }),
-      });
-      const data = await res.json();
-      document.getElementById("qrUrl").textContent = data.qr_url;
-      document.getElementById("qrImg").src = "/api/qr?t=" + Date.now();
-    }
-
-    async function saveShopId() {
-      const sid = document.getElementById("shopId").value;
-      const res = await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop_id: sid }),
-      });
-      if (res.ok) {
-        setTimeout(loadInfo, 800);
-      }
-    }
-
-    async function saveShopInfo() {
-      const name = document.getElementById("shopName").value;
-      const phone = document.getElementById("shopPhone").value;
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop_name: name, shop_phone: phone }),
-      });
-    }
-
-    async function saveUpi() {
-      const upi = document.getElementById("upiId").value;
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ upi_id: upi }),
-      });
-    }
-
-    async function uploadLogo() {
-      const file = document.getElementById("logoFile").files[0];
-      if (!file) return;
-      const fd = new FormData();
-      fd.append("file", file);
-      await fetch("/api/logo", { method: "POST", body: fd });
-      alert("Shop logo saved! Check Print QR Poster.");
-    }
-
-    async function loadAutostart() {
-      try {
-        const res = await fetch("/api/autostart");
-        const data = await res.json();
-        const el = document.getElementById("autostartToggle");
-        el.disabled = !data.supported;
-        el.checked = data.enabled;
-      } catch {}
-    }
-
-    document.getElementById("autostartToggle").addEventListener("change", async e => {
-      await fetch(`/api/autostart?enable=${e.target.checked}`, { method: "POST" });
-    });
-
-    async function savePrices() {
-      const bw = parseFloat(document.getElementById("priceBw").value);
-      const col = parseFloat(document.getElementById("priceColor").value);
-      await fetch("/api/settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          price_bw: isNaN(bw) ? 2 : bw,
-          price_color: isNaN(col) ? 10 : col,
-        }),
-      });
-    }
-
-    async function loadJobs() {
-      try {
-        const res = await fetch("/api/jobs");
-        const data = await res.json();
-        const tbody = document.getElementById("jobsBody");
-
-        // Notification beep on new job
-        if (data.has_new_job && data.jobs.length) {
-          playNotificationBeep();
-          if (Notification.permission === "granted") {
-            new Notification("🖨️ New Print Job!", {
-              body: `${data.jobs[0].customer_name} — ${data.jobs[0].filename}`,
-            });
-          }
-        }
-
-        // Stats
-        const stats = { total: data.jobs.length, printed: 0, printing: 0, failed: 0, waiting: 0 };
-        data.jobs.forEach(j => {
-          if (j.status === "printed") stats.printed++;
-          else if (j.status === "printing" || j.status === "queued") stats.printing++;
-          else if (j.status === "failed") stats.failed++;
-          else if (j.status === "waiting_approval") stats.waiting++;
-        });
-        document.getElementById("statsBar").innerHTML = `
-          <span class="stat-pill">Total: ${stats.total}</span>
-          <span class="stat-pill active">💰 Revenue: ₹${(data.total_revenue || 0).toFixed(0)}</span>
-          ${stats.printing ? `<span class="stat-pill active">⏳ Printing: ${stats.printing}</span>` : ""}
-          ${stats.printed ? `<span class="stat-pill">✅ Printed: ${stats.printed}</span>` : ""}
-          ${stats.waiting ? `<span class="stat-pill">🔵 Waiting: ${stats.waiting}</span>` : ""}
-          ${stats.failed ? `<span class="stat-pill" style="color:#fca5a5;">❌ Failed: ${stats.failed}</span>` : ""}
-        `;
-
-        if (!data.jobs.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="icon">📭</div>No print jobs yet.<br/>Waiting for customers to scan the QR code...</td></tr>`;
-          return;
-        }
-        tbody.innerHTML = data.jobs.map(j => `
-          <tr>
-            <td>
-              <div><strong style="color:#93c5fd;">#${j.token || "-"}</strong> • <strong>${j.customer_name}</strong></div>
-              <div style="font-size:0.76rem; color:var(--muted);">${j.created_at}</div>
-            </td>
-            <td>
-              <div>${j.filename}</div>
-              <div style="font-size:0.76rem; color:var(--muted);">${j.selected_pages || j.total_file_pages} pg • ${(j.file_size/1024).toFixed(0)} KB</div>
-            </td>
-            <td style="font-size:0.82rem;">
-              ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies} • <strong style="color:#86efac;">₹${j.total_price ?? 0}</strong>
-            </td>
-            <td>
-              <span class="badge ${j.status}">${j.status.replace("_"," ")}</span>
-              <div class="job-msg">${j.message}</div>
-            </td>
-            <td>
-              <div style="display:flex; gap:5px;">
-                <button class="btn btn-success" onclick="reprintJob('${j.id}')">${j.status === "payment_confirming" ? "💳 Verify & Print" : (j.status === "waiting_approval" ? "✓ Print" : "↻")}</button>
-                <button class="btn btn-danger" onclick="deleteJob('${j.id}')">✕</button>
-              </div>
-            </td>
-          </tr>
-        `).join("");
-      } catch {}
-    }
-
-    async function reprintJob(id) {
-      await fetch(`/api/jobs/${id}/reprint`, { method: "POST" });
-      loadJobs();
-    }
-
-    async function deleteJob(id) {
-      await fetch(`/api/jobs/${id}`, { method: "DELETE" });
-      loadJobs();
-    }
-
-    // Request notification permission
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-
-    loadInfo();
-    loadPrinters();
-    loadJobs();
-    loadAutostart();
-    setInterval(loadJobs, 2000);
-  </script>
+<div class="toast" id="toast" hidden></div>
+<script src="/static/admin.js"></script>
 </body>
 </html>

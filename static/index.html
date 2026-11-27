@@ -1,677 +1,176 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <meta name="theme-color" content="#3b82f6" />
-  <link rel="manifest" href="/static/manifest.json" />
-  <title>Scan &amp; Print — Instant Print Shop</title>
-  <style>
-    :root {
-      --bg: #0b1120;
-      --card: #162032;
-      --surface: #0f172a;
-      --border: #2b3950;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --primary: #3b82f6;
-      --primary-dark: #2563eb;
-      --success: #22c55e;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 16px 14px 36px;
-    }
-    .container { max-width: 500px; margin: 0 auto; }
-
-    header { text-align: center; margin-bottom: 18px; }
-    header h1 { font-size: 1.55rem; letter-spacing: -0.3px; margin-bottom: 4px; }
-    header p { color: var(--muted); font-size: 0.88rem; }
-    .shop-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      margin-top: 10px; padding: 5px 14px; border-radius: 999px;
-      font-size: 0.78rem; font-weight: 600;
-      background: rgba(34, 197, 94, 0.12);
-      border: 1px solid rgba(34, 197, 94, 0.35);
-      color: #86efac;
-    }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-      margin-bottom: 14px;
-    }
-    .step-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 12px; font-size: 0.88rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.4px; color: #cbd5e1;
-    }
-    .step-num {
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--primary); color: #fff;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-size: 0.75rem; font-weight: 800;
-    }
-
-    .dropzone {
-      border: 2px dashed #475569; border-radius: 14px;
-      padding: 26px 16px; text-align: center; cursor: pointer;
-      transition: all 0.2s; background: rgba(15, 23, 42, 0.45);
-    }
-    .dropzone.dragover { border-color: var(--primary); background: rgba(59,130,246,0.1); }
-    .dropzone.has-files { border-color: var(--success); border-style: solid; background: rgba(34,197,94,0.06); }
-    .dropzone input { display: none; }
-    .dropzone .icon { font-size: 2.2rem; margin-bottom: 6px; }
-    .dropzone .main-text { font-size: 1rem; font-weight: 600; }
-    .dropzone .hint { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
-
-    .file-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .file-item {
-      display: flex; justify-content: space-between; align-items: center;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 9px 12px; font-size: 0.86rem;
-    }
-    .file-item .fi-info { display: flex; align-items: center; gap: 8px; overflow: hidden; }
-    .file-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file-item .fi-size { color: var(--muted); font-size: 0.76rem; flex-shrink: 0; margin-left: 8px; }
-    .file-item .fi-remove {
-      background: none; border: none; color: var(--danger);
-      font-weight: 700; cursor: pointer; font-size: 1rem; padding: 2px 6px; margin-left: 6px;
-    }
-
-    .opt-group { margin-bottom: 14px; }
-    .opt-group:last-child { margin-bottom: 0; }
-    .opt-label {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.82rem; color: var(--muted); font-weight: 600; margin-bottom: 6px;
-    }
-    .opt-hint { font-size: 0.74rem; color: #64748b; font-weight: 400; }
-
-    .seg-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .seg-btn {
-      padding: 11px 10px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--muted); font-weight: 600;
-      cursor: pointer; text-align: center; font-size: 0.9rem; transition: all 0.15s;
-    }
-    .seg-btn.active {
-      background: rgba(59,130,246,0.2); border-color: var(--primary); color: #fff;
-    }
-
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    input[type="text"], input[type="number"], select {
-      width: 100%; padding: 10px 12px; border-radius: 10px;
-      border: 1px solid var(--border); background: var(--surface);
-      color: var(--text); font-size: 0.92rem;
-    }
-    .copies-row { display: flex; align-items: center; gap: 6px; }
-    .copies-row button {
-      width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--text); font-size: 1.25rem; cursor: pointer;
-    }
-    .copies-row input { text-align: center; }
-
-    .adv-toggle {
-      display: flex; align-items: center; gap: 6px; cursor: pointer;
-      color: #93c5fd; font-size: 0.82rem; font-weight: 600; margin-top: 12px;
-    }
-    .adv-body { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-    .adv-body.open { display: block; }
-
-    .submit-btn {
-      width: 100%; padding: 15px; border: none; border-radius: 14px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff; font-size: 1.06rem; font-weight: 700; cursor: pointer;
-      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
-    }
-    .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
-
-    .help-card {
-      background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border);
-      border-radius: 14px; padding: 14px 16px; margin-top: 14px; font-size: 0.8rem; color: var(--muted);
-      line-height: 1.6;
-    }
-    .help-card strong { color: #cbd5e1; }
-
-    .error-msg {
-      color: #fca5a5; background: rgba(239,68,68,0.12);
-      border: 1px solid rgba(239,68,68,0.35);
-      padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: none; font-size: 0.86rem;
-    }
-
-    .status-section { display: none; margin-top: 14px; }
-    .status-section.visible { display: block; }
-    .job-card {
-      padding: 12px; border-radius: 10px; background: var(--surface);
-      border: 1px solid var(--border); margin-top: 8px;
-    }
-    .job-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .badge {
-      padding: 3px 9px; border-radius: 999px; font-size: 0.7rem;
-      font-weight: 700; text-transform: uppercase; flex-shrink: 0;
-    }
-    .badge.queued, .badge.printing { background: rgba(245,158,11,0.2); color: #fcd34d; }
-    .badge.printed { background: rgba(34,197,94,0.2); color: #86efac; }
-    .badge.failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
-    .badge.waiting_approval { background: rgba(59,130,246,0.2); color: #93c5fd; }
-
-    .success-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(11,17,32,0.93);
-      z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 24px;
-    }
-    .success-overlay.show { display: flex; }
-    .success-check {
-      width: 92px; height: 92px; border-radius: 50%; background: rgba(34,197,94,0.15);
-      border: 3px solid var(--success); display: flex; align-items: center; justify-content: center;
-      font-size: 2.8rem; color: var(--success);
-    }
-    .success-text { text-align: center; margin-top: 18px; }
-    .success-text h2 { font-size: 1.45rem; color: var(--success); margin-bottom: 6px; }
-    .success-text p { color: var(--muted); font-size: 0.92rem; }
-    .success-close {
-      margin-top: 22px; padding: 12px 28px; border-radius: 12px;
-      border: 1px solid var(--border); background: var(--card); color: var(--text);
-      font-weight: 600; cursor: pointer; font-size: 0.96rem;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>Scan &amp; Print</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
-  <div class="container">
-    <header>
-      <h1 id="hdrTitle">🖨️ Scan &amp; Print</h1>
-      <p id="hdrSub">Upload photos, PDFs, or Word files — prints automatically</p>
-      <div class="shop-badge" id="shopBadge">● Connecting...</div>
-    </header>
+<body class="customer">
+<header class="shopbar">
+  <img id="logo" class="logo" alt="" hidden>
+  <div>
+    <div class="shopname" id="shopName">Print Shop</div>
+    <div class="sub" id="shopSub">Scan · Pay · Print</div>
+  </div>
+</header>
 
-    <div class="error-msg" id="errorBox"></div>
+<main class="wrap">
+  <div id="closed" class="card notice" hidden>
+    <div class="big-ico">⏸️</div>
+    <h2>Not taking orders right now</h2>
+    <p class="muted">Please ask at the counter.</p>
+  </div>
 
-    <form id="printForm">
-      <!-- Step 1: Files -->
-      <div class="card">
-        <div class="step-header"><span class="step-num">1</span> Choose Your Files</div>
-        <div class="dropzone" id="dropzone">
-          <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.bmp,.gif,.webp,.tiff,.tif,.pdf,.doc,.docx,.txt,.csv,.md" />
-          <div class="icon" id="dropIcon">📄📸</div>
-          <div class="main-text" id="dropText">Tap to select Photos, PDF, or Word</div>
-          <div class="hint">JPG, PNG, PDF, DOC/DOCX, TXT • Up to 10 files (50MB max)</div>
+  <ol class="steps" id="steps">
+    <li data-step="files" class="active"><span>1</span>Files</li>
+    <li data-step="options"><span>2</span>Options</li>
+    <li data-step="pay"><span>3</span>Pay</li>
+    <li data-step="status"><span>4</span>Print</li>
+  </ol>
+
+  <!-- STEP 1: FILES -->
+  <section id="v-files" class="view">
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" multiple>
+      <div class="drop-ico">📄</div>
+      <div class="drop-title">Tap to choose files</div>
+      <div class="muted small" id="typesHint">PDF, photos, Word, TXT</div>
+    </label>
+    <div id="fileList" class="files"></div>
+    <div class="err" id="filesErr" hidden></div>
+    <div class="bottombar">
+      <button class="btn primary block" id="toOptions" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: OPTIONS -->
+  <section id="v-options" class="view" hidden>
+    <div class="card">
+      <div class="field">
+        <div class="label">Print colour</div>
+        <div class="seg" id="segColor">
+          <button data-v="bw" class="on">Black &amp; White<small id="pBw"></small></button>
+          <button data-v="color">Colour<small id="pColor"></small></button>
         </div>
-        <div class="file-list" id="fileList"></div>
+        <div class="muted small" id="colorNote" hidden>This printer prints black &amp; white only.</div>
       </div>
-
-      <!-- Step 2: Options -->
-      <div class="card">
-        <div class="step-header"><span class="step-num">2</span> Print Settings</div>
-
-        <div class="opt-group">
-          <div class="opt-label"><span>Color Mode</span></div>
-          <div class="seg-group">
-            <button type="button" class="seg-btn active" data-color="color" id="colorBtn">🎨 Color</button>
-            <button type="button" class="seg-btn" data-color="bw" id="bwBtn">⬛ Black &amp; White</button>
-          </div>
+      <div class="field" id="sidesField">
+        <div class="label">Sides</div>
+        <div class="seg" id="segSides">
+          <button data-v="one" class="on">1-sided</button>
+          <button data-v="long">2-sided</button>
         </div>
-
-        <div class="opt-group">
-          <div class="opt-label">
-            <span>Print Sides</span>
-            <span class="opt-hint">2-sided saves paper</span>
-          </div>
-          <div class="seg-group">
-            <button type="button" class="seg-btn active" data-sides="one">📄 One Side</button>
-            <button type="button" class="seg-btn" data-sides="both">📑 Both Sides</button>
-          </div>
-        </div>
-
-        <div class="opt-group">
-          <div class="opt-label">
-            <span>Pages</span>
-            <span class="opt-hint">e.g. all, 1-3, or 2,5</span>
-          </div>
-          <div class="seg-group" style="margin-bottom:8px;">
-            <button type="button" class="seg-btn active" id="pagesAllBtn">All Pages</button>
-            <button type="button" class="seg-btn" id="pagesCustomBtn">Custom Pages</button>
-          </div>
-          <input type="text" id="pageRange" value="all" placeholder="e.g. 1-3, 5" style="display:none;" />
-        </div>
-
-        <div class="row2">
-          <div class="opt-group">
-            <div class="opt-label"><span>Copies</span></div>
-            <div class="copies-row">
-              <button type="button" id="decCopies">−</button>
-              <input type="number" id="copies" value="1" min="1" max="99" />
-              <button type="button" id="incCopies">+</button>
-            </div>
-          </div>
-          <div class="opt-group">
-            <div class="opt-label"><span>Your Name</span></div>
-            <input type="text" id="customerName" placeholder="Optional" />
-          </div>
-        </div>
-
-        <div class="adv-toggle" id="advToggle">▸ Paper Size &amp; Orientation</div>
-        <div class="adv-body" id="advBody">
-          <div class="row2">
-            <div class="opt-group">
-              <div class="opt-label"><span>Paper Size</span></div>
-              <select id="paperSize">
-                <option value="A4">A4 (Standard)</option>
-                <option value="Letter">Letter</option>
-                <option value="Legal">Legal</option>
-                <option value="A3">A3</option>
-                <option value="A5">A5</option>
-              </select>
-            </div>
-            <div class="opt-group">
-              <div class="opt-label"><span>Orientation</span></div>
-              <select id="orientation">
-                <option value="auto">Auto (Best Fit)</option>
-                <option value="portrait">Portrait</option>
-                <option value="landscape">Landscape</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <div class="muted small" id="manualNote" hidden>For 2-sided, the shop turns the pages over by hand, so it takes a little longer.</div>
       </div>
-
-      <div id="priceSummary" style="display:none; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:14px; padding:12px 16px; margin-bottom:12px; display:none; justify-content:space-between; align-items:center;">
+      <div class="field row">
         <div>
-          <div style="font-size:0.78rem; color:#94a3b8;">Estimated Total</div>
-          <div id="priceBreakdown" style="font-size:0.82rem; color:#cbd5e1;"></div>
+          <div class="label">Copies</div>
+          <div class="stepper">
+            <button id="cMinus" aria-label="Fewer copies">−</button>
+            <input id="copies" type="number" inputmode="numeric" min="1" value="1">
+            <button id="cPlus" aria-label="More copies">+</button>
+          </div>
         </div>
-        <div id="priceTotal" style="font-size:1.45rem; font-weight:800; color:#86efac;">₹0</div>
+        <div id="paperField">
+          <div class="label">Paper</div>
+          <select id="paper"></select>
+        </div>
       </div>
-
-      <button type="submit" class="submit-btn" id="submitBtn" disabled>
-        Select files to print
-      </button>
-    </form>
-
-    <div class="card status-section" id="statusSection">
-      <div class="step-header"><span class="step-num">✓</span> Live Print Status</div>
-      <div id="statusList"></div>
-    </div>
-
-    <div class="help-card">
-      <strong>Need help?</strong><br />
-      • <strong>Images &amp; Photos:</strong> Automatically scaled to fit the page cleanly.<br />
-      • <strong>PDF &amp; Word (.docx):</strong> Pick <em>Custom Pages</em> if you only want specific pages (like <code>1-3, 5</code>).<br />
-      • <strong>Instant Printing:</strong> Your file goes directly to the shop printer—collect it at the counter!
-    </div>
-  </div>
-
-  <div class="success-overlay" id="successOverlay" style="overflow-y:auto;">
-    <div class="success-check" id="overlayIcon">✓</div>
-    <div class="success-text" style="width:100%; max-width:400px;">
-      <h2 id="successTitle">Sent to Printer!</h2>
-      <p id="successDetail">Your files are printing automatically.</p>
-      <div id="upiBox" style="display:none; margin-top:14px; background:#162032; border:1px solid #2b3950; border-radius:14px; padding:14px; text-align:center;">
-        <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:8px;">Pay first to start printing:</div>
-        <img id="upiQrImg" src="" alt="UPI QR" style="width:150px; height:150px; background:#fff; padding:6px; border-radius:10px; display:block; margin:0 auto 10px;" />
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-          <a id="gpayLink" href="#" style="padding:10px 8px; border-radius:10px; background:#1e293b; border:1px solid #334155; color:#fff; font-weight:700; text-decoration:none; font-size:0.84rem;">GPay</a>
-          <a id="phonepeLink" href="#" style="padding:10px 8px; border-radius:10px; background:#5f259f; color:#fff; font-weight:700; text-decoration:none; font-size:0.84rem;">PhonePe</a>
-          <a id="paytmLink" href="#" style="padding:10px 8px; border-radius:10px; background:#00baf2; color:#042f4b; font-weight:700; text-decoration:none; font-size:0.84rem;">Paytm</a>
-          <a id="allUpiLink" href="#" style="padding:10px 8px; border-radius:10px; background:#22c55e; color:#052e16; font-weight:700; text-decoration:none; font-size:0.84rem;">All UPI Apps</a>
+      <div class="field">
+        <div class="label">Page direction</div>
+        <div class="seg small3" id="segOrient">
+          <button data-v="auto" class="on">Auto</button>
+          <button data-v="portrait">Portrait</button>
+          <button data-v="landscape">Landscape</button>
         </div>
-        <input type="text" id="upiRefInput" placeholder="Optional: Last 4 digits / UTR ref" style="margin-bottom:8px; font-size:0.84rem;" />
-        <button type="button" id="confirmPaidBtn" style="width:100%; padding:12px; border:none; border-radius:10px; background:#3b82f6; color:#fff; font-weight:800; font-size:0.95rem; cursor:pointer;">
-          ✅ I Have Paid — Send to Printer
-        </button>
+      </div>
+      <div class="field">
+        <div class="label">Your name <span class="muted">(optional)</span></div>
+        <input id="custName" maxlength="40" placeholder="So the shop can call you" autocomplete="name">
       </div>
     </div>
-    <button class="success-close" id="successClose">View Live Status / Print More</button>
-  </div>
+    <div class="err" id="optErr" hidden></div>
+    <div class="bottombar">
+      <div class="totalline"><span id="optPages"></span><strong id="optTotal">₹0</strong></div>
+      <div class="btnrow">
+        <button class="btn ghost" data-back="files">Back</button>
+        <button class="btn primary grow" id="toPay">Review &amp; pay</button>
+      </div>
+    </div>
+  </section>
 
-  <script>
-    const fileInput = document.getElementById("fileInput");
-    const dropzone = document.getElementById("dropzone");
-    const fileListEl = document.getElementById("fileList");
-    const errorBox = document.getElementById("errorBox");
-    const submitBtn = document.getElementById("submitBtn");
-    const statusSection = document.getElementById("statusSection");
-    const statusList = document.getElementById("statusList");
-    const successOverlay = document.getElementById("successOverlay");
-    const pageRangeInput = document.getElementById("pageRange");
+  <!-- STEP 3: PAY -->
+  <section id="v-pay" class="view" hidden>
+    <div class="card">
+      <h3 class="card-title">Order summary</h3>
+      <div id="summary"></div>
+      <div class="sumtotal"><span>Total</span><strong id="payTotal">₹0</strong></div>
+      <div class="muted small" id="minNote" hidden></div>
+    </div>
+    <div class="err" id="payErr" hidden></div>
+    <div class="bottombar">
+      <button class="btn primary block" id="payOnline" hidden>Pay online</button>
+      <button class="btn outline block" id="payCounter" hidden>Pay at counter</button>
+      <button class="btn ghost block" data-back="options">Back</button>
+    </div>
+  </section>
 
-    let selectedFiles = [];
-    let filePagesMap = new WeakMap();
-    let colorMode = "color";
-    let sidesMode = "one";
-    let priceBw = 2;
-    let priceColor = 10;
-    let shopUpiId = "";
-    let shopNameVal = "QR Print Shop";
-    let activeJobIds = [];
-    let pollTimer = null;
+  <!-- STEP 4: STATUS -->
+  <section id="v-status" class="view" hidden>
+    <div class="card center">
+      <div class="muted small">Your token</div>
+      <div class="token" id="token">#—</div>
+      <div class="statusline" id="statusLine"></div>
+      <ol class="timeline" id="timeline">
+        <li data-t="paid">Payment</li>
+        <li data-t="queued">In queue</li>
+        <li data-t="printing">Printing</li>
+        <li data-t="printed">Ready</li>
+      </ol>
+      <div class="progress" id="progressWrap" hidden><div id="progressBar"></div></div>
+      <div class="muted small" id="helpLine" hidden style="margin-top:14px">Questions? Call the shop: <a id="shopTel"></a></div>
+    </div>
 
-    fetch("/api/info").then(r => r.json()).then(data => {
-      const label = data.shop_name || data.active_printer || "Shop Printer";
-      shopNameVal = data.shop_name || "QR Print Shop";
-      shopUpiId = data.upi_id || "";
-      const mode = data.auto_print ? "Auto-Print ON" : "Approval Mode";
-      document.getElementById("shopBadge").textContent = `● ${label} • ${mode}`;
-      if (typeof data.price_bw === "number") priceBw = data.price_bw;
-      if (typeof data.price_color === "number") priceColor = data.price_color;
-      document.getElementById("colorBtn").textContent = `🎨 Color (₹${priceColor}/pg)`;
-      document.getElementById("bwBtn").textContent = `⬛ B&W (₹${priceBw}/pg)`;
-      updatePriceSummary();
-    }).catch(() => {
-      document.getElementById("shopBadge").textContent = "● Connected";
-    });
-
-      document.querySelectorAll("[data-color]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("[data-color]").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        colorMode = btn.dataset.color;
-        updatePriceSummary();
-      });
-    });
-
-    document.querySelectorAll("[data-sides]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("[data-sides]").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        sidesMode = btn.dataset.sides;
-      });
-    });
-
-    document.getElementById("pagesAllBtn").addEventListener("click", () => {
-      document.getElementById("pagesAllBtn").classList.add("active");
-      document.getElementById("pagesCustomBtn").classList.remove("active");
-      pageRangeInput.style.display = "none";
-      pageRangeInput.value = "all";
-    });
-    document.getElementById("pagesCustomBtn").addEventListener("click", () => {
-      document.getElementById("pagesCustomBtn").classList.add("active");
-      document.getElementById("pagesAllBtn").classList.remove("active");
-      pageRangeInput.style.display = "block";
-      if (pageRangeInput.value === "all") pageRangeInput.value = "";
-      pageRangeInput.focus();
-    });
-
-    document.getElementById("decCopies").onclick = () => {
-      const el = document.getElementById("copies");
-      el.value = Math.max(1, (parseInt(el.value, 10) || 1) - 1);
-      updatePriceSummary();
-    };
-    document.getElementById("incCopies").onclick = () => {
-      const el = document.getElementById("copies");
-      el.value = Math.min(99, (parseInt(el.value, 10) || 1) + 1);
-      updatePriceSummary();
-    };
-    document.getElementById("copies").addEventListener("input", updatePriceSummary);
-
-    document.getElementById("advToggle").addEventListener("click", () => {
-      document.getElementById("advBody").classList.toggle("open");
-    });
-
-    dropzone.addEventListener("click", () => fileInput.click());
-    dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
-    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-    dropzone.addEventListener("drop", e => { e.preventDefault(); dropzone.classList.remove("dragover"); addFiles(e.dataTransfer.files); });
-    fileInput.addEventListener("change", () => { addFiles(fileInput.files); fileInput.value = ""; });
-
-    async function addFiles(files) {
-      for (const f of files) {
-        if (selectedFiles.length >= 10) { showError("Maximum 10 files per upload."); break; }
-        if (f.size > 50 * 1024 * 1024) { showError(`${f.name} is over 50MB.`); continue; }
-        selectedFiles.push(f);
-        const ext = f.name.split(".").pop().toLowerCase();
-        if (["jpg","jpeg","png","bmp","webp"].includes(ext)) {
-          filePagesMap.set(f, 1);
-        } else {
-          filePagesMap.set(f, "...");
-          inspectFilePages(f);
-        }
-      }
-      renderFiles();
-    }
-
-    async function inspectFilePages(file) {
-      try {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/inspect", { method: "POST", body: fd });
-        if (res.ok) {
-          const data = await res.json();
-          filePagesMap.set(file, data.pages);
-        } else {
-          filePagesMap.set(file, "?");
-        }
-      } catch {
-        filePagesMap.set(file, "?");
-      }
-      renderFiles();
-    }
-
-    function fileIcon(name) {
-      const ext = name.split(".").pop().toLowerCase();
-      if (["jpg","jpeg","png","bmp","gif","webp","tiff","tif"].includes(ext)) return "🖼️";
-      if (ext === "pdf") return "📕";
-      if (["doc","docx"].includes(ext)) return "📘";
-      return "📝";
-    }
-
-    function formatSize(bytes) {
-      if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-      return (bytes / 1024 / 1024).toFixed(1) + " MB";
-    }
-
-    function renderFiles() {
-      fileListEl.innerHTML = "";
-      let totalPages = 0;
-      let allKnown = selectedFiles.length > 0;
-
-      selectedFiles.forEach((f, idx) => {
-        const pg = filePagesMap.get(f);
-        if (typeof pg === "number") totalPages += pg;
-        else allKnown = false;
-
-        const pgLabel = pg === "..." ? "counting..." : (pg === "?" ? "" : `${pg} ${pg === 1 ? "page" : "pages"}`);
-        const row = document.createElement("div");
-        row.className = "file-item";
-        row.innerHTML = `
-          <div class="fi-info">
-            <span>${fileIcon(f.name)}</span>
-            <span class="fi-name">${f.name}</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            ${pgLabel ? `<span style="background:rgba(59,130,246,0.18); color:#93c5fd; padding:2px 8px; border-radius:999px; font-size:0.74rem; font-weight:700;">${pgLabel}</span>` : ""}
-            <span class="fi-size">${formatSize(f.size)}</span>
-          </div>
-        `;
-        const rm = document.createElement("button");
-        rm.type = "button"; rm.className = "fi-remove"; rm.textContent = "✕";
-        rm.onclick = () => { selectedFiles.splice(idx, 1); renderFiles(); };
-        row.lastElementChild.appendChild(rm);
-        fileListEl.appendChild(row);
-      });
-
-      const hasFiles = selectedFiles.length > 0;
-      dropzone.classList.toggle("has-files", hasFiles);
-      document.getElementById("dropIcon").textContent = hasFiles ? "✅" : "📄📸";
-      document.getElementById("dropText").textContent = hasFiles
-        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? "s" : ""} ready${allKnown ? ` • ${totalPages} total ${totalPages === 1 ? "page" : "pages"}` : ""}`
-        : "Tap to select Photos, PDF, or Word";
-      submitBtn.disabled = !hasFiles;
-      submitBtn.textContent = hasFiles
-        ? `🖨️ Print ${selectedFiles.length} File${selectedFiles.length > 1 ? "s" : ""}${allKnown ? ` (${totalPages} pg)` : ""} Now`
-        : "Select files to print";
-      updatePriceSummary();
-    }
-
-    function updatePriceSummary() {
-      const box = document.getElementById("priceSummary");
-      if (!selectedFiles.length) {
-        box.style.display = "none";
-        return;
-      }
-      let totalPages = 0;
-      let allKnown = true;
-      selectedFiles.forEach(f => {
-        const pg = filePagesMap.get(f);
-        if (typeof pg === "number") totalPages += pg;
-        else allKnown = false;
-      });
-      if (!allKnown) {
-        box.style.display = "none";
-        return;
-      }
-      const copies = Math.max(1, parseInt(document.getElementById("copies").value, 10) || 1);
-      const rate = colorMode === "bw" ? priceBw : priceColor;
-      const total = (totalPages * copies * rate).toFixed(0);
-      document.getElementById("priceBreakdown").textContent =
-        `${totalPages} pg × ${copies} ${copies > 1 ? "copies" : "copy"} × ₹${rate}/pg`;
-      document.getElementById("priceTotal").textContent = `₹${total}`;
-      box.style.display = "flex";
-    }
-
-    function showError(msg) {
-      errorBox.textContent = msg;
-      errorBox.style.display = msg ? "block" : "none";
-    }
-
-    document.getElementById("printForm").addEventListener("submit", async e => {
-      e.preventDefault();
-      showError("");
-      if (!selectedFiles.length) return;
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = "⏳ Uploading & Sending to Printer...";
-
-      const form = new FormData();
-      selectedFiles.forEach(f => form.append("files", f));
-      form.append("color_mode", colorMode);
-      form.append("sides", sidesMode);
-      form.append("page_range", (pageRangeInput.value || "all").trim() || "all");
-      form.append("copies", document.getElementById("copies").value || "1");
-      form.append("orientation", document.getElementById("orientation").value);
-      form.append("paper_size", document.getElementById("paperSize").value);
-      form.append("customer_name", document.getElementById("customerName").value || "Walk-in Customer");
-
-      try {
-        const res = await fetch("/api/upload", { method: "POST", body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Upload failed");
-        if (data.errors && data.errors.length) showError(data.errors.join(" | "));
-
-        const count = selectedFiles.length;
-        selectedFiles = [];
-        renderFiles();
-
-        activeJobIds = data.jobs.map(j => j.id);
-        statusSection.classList.add("visible");
-        renderStatuses(data.jobs);
-        startPolling();
-
-        const tokens = data.jobs.map(j => `#${j.token}`).join(", ");
-        const totalAmt = data.jobs.reduce((acc, j) => acc + (j.total_price || 0), 0);
-        const upiBox = document.getElementById("upiBox");
-        const needsPay = data.jobs.some(j => j.status === "awaiting_payment");
-
-        if (needsPay && shopUpiId && totalAmt > 0) {
-          document.getElementById("overlayIcon").textContent = "💳";
-          document.getElementById("successTitle").textContent = "Complete Payment to Print";
-          document.getElementById("successDetail").innerHTML =
-            `<div style="font-size:1.45rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens} • ₹${totalAmt}</div>` +
-            `Printing starts only after payment is completed.`;
-          const note = `Token ${tokens}`;
-          const params = `pa=${encodeURIComponent(shopUpiId)}&pn=${encodeURIComponent(shopNameVal)}&am=${totalAmt.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
-          document.getElementById("upiQrImg").src = `/api/upi-qr?amount=${totalAmt}&note=${encodeURIComponent(note)}`;
-          document.getElementById("gpayLink").href = `tez://upi/pay?${params}`;
-          document.getElementById("phonepeLink").href = `phonepe://pay?${params}`;
-          document.getElementById("paytmLink").href = `paytmmp://pay?${params}`;
-          const isAndroid = /android/i.test(navigator.userAgent);
-          document.getElementById("allUpiLink").href = isAndroid
-            ? `intent://pay?${params}#Intent;scheme=upi;end`
-            : `upi://pay?${params}`;
-          upiBox.style.display = "block";
-        } else {
-          document.getElementById("overlayIcon").textContent = "✓";
-          document.getElementById("successTitle").textContent = "Sent to Printer!";
-          document.getElementById("successDetail").innerHTML =
-            `<div style="font-size:1.5rem; font-weight:800; color:#f8fafc; margin:6px 0;">Token ${tokens}</div>` +
-            `${count} file${count > 1 ? "s" : ""} sent to printer • Total: <strong>₹${totalAmt}</strong>`;
-          upiBox.style.display = "none";
-        }
-        successOverlay.classList.add("show");
-      } catch (err) {
-        showError(err.message);
-      } finally {
-        submitBtn.disabled = !selectedFiles.length;
-        if (!selectedFiles.length) submitBtn.textContent = "Select files to print";
-      }
-    });
-
-    document.getElementById("confirmPaidBtn").addEventListener("click", async () => {
-      const btn = document.getElementById("confirmPaidBtn");
-      const ref = document.getElementById("upiRefInput").value || "";
-      btn.disabled = true;
-      btn.textContent = "⏳ Confirming & Sending to Printer...";
-      try {
-        await Promise.all(
-          activeJobIds.map(id =>
-            fetch(`/api/jobs/${id}/customer-paid`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ upi_ref: ref }),
-            })
-          )
-        );
-        document.getElementById("upiBox").style.display = "none";
-        document.getElementById("overlayIcon").textContent = "✓";
-        document.getElementById("successTitle").textContent = "Payment Submitted!";
-        document.getElementById("successDetail").textContent = "Your print job has been sent to the shop system.";
-        startPolling();
-      } catch {
-        showError("Could not confirm payment. Please try again.");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "✅ I Have Paid — Send to Printer";
-      }
-    });
-
-    document.getElementById("successClose").addEventListener("click", () => {
-      successOverlay.classList.remove("show");
-    });
-
-    function renderStatuses(jobs) {
-      statusList.innerHTML = jobs.map(j => `
-        <div class="job-card">
-          <div class="job-top">
-            <span style="font-weight:600; font-size:0.9rem; overflow:hidden; text-overflow:ellipsis;">
-              <strong style="color:#93c5fd;">#${j.token}</strong> • ${fileIcon(j.filename)} ${j.filename}
-            </span>
-            <span class="badge ${j.status}">${j.status.replace("_", " ")}</span>
-          </div>
-          <div style="font-size:0.78rem; color:#94a3b8; margin-top:5px;">
-            ${j.message} • ${j.color_mode === "bw" ? "B&W" : "Color"} • ${j.sides === "both" ? "2-Sided" : "1-Sided"} • x${j.copies} • <strong style="color:#86efac;">₹${j.total_price}</strong>
-          </div>
+    <div class="card" id="payBox" hidden>
+      <h3 class="card-title">Pay <span id="payAmt"></span></h3>
+      <div id="rzpBox" hidden>
+        <p class="muted small">Pay securely with any UPI app, card or wallet. Printing starts automatically once
+          payment is received.</p>
+        <button class="btn primary block" id="rzpOpen">Pay now</button>
+      </div>
+      <div id="upiBox" hidden>
+        <div class="label">Tap the app you use</div>
+        <div class="upiapps" id="upiApps"></div>
+        <p class="muted small" id="upiTip">If the wrong app opens every time, tap the exact app above instead of "Any UPI app".</p>
+        <div class="upiqr"><img id="upiQr" alt="UPI QR code"><div class="muted small">Or scan with another phone<br><span id="upiId"></span></div></div>
+        <div class="field">
+          <div class="label">After paying</div>
+          <input id="utr" maxlength="30" placeholder="UPI reference / UTR (optional)" inputmode="numeric">
         </div>
-      `).join("");
-    }
+        <button class="btn outline block" id="claimPaid">I have paid</button>
+        <p class="muted small" id="claimNote" hidden>Thanks! The shopkeeper will confirm your payment and your print
+          will start right away.</p>
+      </div>
+      <div id="counterBox" hidden>
+        <p>Please pay <strong id="cAmt"></strong> at the counter and tell them token <strong id="cTok"></strong>.
+          Your print starts as soon as they confirm.</p>
+      </div>
+    </div>
 
-    function startPolling() {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(async () => {
-        if (!activeJobIds.length) return;
-        const jobs = await Promise.all(
-          activeJobIds.map(id => fetch(`/api/jobs/${id}`).then(r => r.ok ? r.json() : null))
-        );
-        const valid = jobs.filter(Boolean);
-        if (valid.length) renderStatuses(valid);
-        if (valid.every(j => j.status === "printed" || j.status === "failed")) clearInterval(pollTimer);
-      }, 1500);
-    }
-  </script>
+    <div class="card" id="itemsCard">
+      <h3 class="card-title">Files</h3>
+      <div id="statusItems"></div>
+    </div>
+    <div class="bottombar">
+      <button class="btn ghost block" id="newOrder">Print something else</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+<script src="/static/customer.js"></script>
 </body>
 </html>
