@@ -106,6 +106,8 @@ async function loadState() {
     + (cp ? ` &nbsp; <span class="dot ${cp.ok ? "" : "bad"}"></span>Colour: ${esc(cp.name)} · ${esc(cp.status)}` : "");
   $("tAccepting").checked = s.accepting_orders;
   $("tAuto").checked = s.auto_print;
+  $("tDuplex").checked = s.duplex_mode !== "off";
+  if (s.duplex_mode !== "off") { try { localStorage.setItem("qp_duplex_on_mode", s.duplex_mode); } catch {} }
   $("soundBtn").textContent = soundOn ? "🔔 Sound on" : "🔕 Sound off";
 
   // alerts
@@ -187,6 +189,12 @@ async function saveSettings(obj, msg = "Saved") {
   catch (ex) { toast(ex.message, 5000); return false; }
 }
 $("tAccepting").addEventListener("change", (e) => saveSettings({ accepting_orders: e.target.checked }, e.target.checked ? "Taking orders" : "Paused — customers see 'closed'"));
+$("tDuplex").addEventListener("change", (e) => {
+  let onMode = "auto";
+  try { onMode = localStorage.getItem("qp_duplex_on_mode") || "auto"; } catch {}
+  saveSettings({ duplex_mode: e.target.checked ? onMode : "off" },
+    e.target.checked ? "2-sided is on - customers can choose it" : "2-sided is off - customers see 1-sided only");
+});
 $("tAuto").addEventListener("change", (e) => saveSettings({ auto_print: e.target.checked }, e.target.checked ? "Auto-print on" : "Auto-print off — you approve each order"));
 $("enable_tunnel").addEventListener("change", () => {});
 $("duplex_mode").addEventListener("change", (e) => saveSettings({ duplex_mode: e.target.value }, "2-sided setting saved"));
